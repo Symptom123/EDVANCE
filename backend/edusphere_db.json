@@ -1,0 +1,313 @@
+{
+  "schools": {
+    "1": {
+      "ID": 1,
+      "name": "NABESK COMPREHENSIVE COLLAGE",
+      "primaryColor": "#b71021",
+      "hasPrimary": false,
+      "hasSecondary": true,
+      "configJson": "{\"roles\":{\"admin\":true,\"teacher\":true,\"parent\":true,\"student\":true},\"modules\":{\"attendance\":true,\"gradebook\":true,\"finance\":false,\"messaging\":true,\"library\":false,\"transport\":false}}",
+      "adminId": 1,
+      "features": {
+        "attendance": false,
+        "grading": false,
+        "assignments": false,
+        "messaging": false,
+        "enrollment": false,
+        "results": false
+      }
+    },
+    "2": {
+      "ID": 2,
+      "name": "NABESK COMPREHENSIVE COLLAGE",
+      "primaryColor": "#ec98a4",
+      "hasPrimary": false,
+      "hasSecondary": true,
+      "configJson": "{\"roles\":{\"admin\":true,\"teacher\":true,\"parent\":true,\"student\":true},\"modules\":{\"attendance\":true,\"gradebook\":true,\"finance\":true,\"messaging\":true,\"library\":false,\"transport\":false}}",
+      "adminId": 2,
+      "features": {
+        "attendance": false,
+        "grading": false,
+        "assignments": false,
+        "messaging": false,
+        "enrollment": false,
+        "results": false
+      }
+    },
+    "3": {
+      "ID": 3,
+      "name": "NABESK COMPREHENSIVE COLLAGE",
+      "primaryColor": "#265f4c",
+      "hasPrimary": true,
+      "hasSecondary": true,
+      "configJson": "{\"roles\":{\"admin\":true,\"teacher\":true,\"parent\":true,\"student\":true},\"modules\":{\"attendance\":true,\"gradebook\":true,\"finance\":true,\"messaging\":true,\"library\":true,\"transport\":true}}",
+      "adminId": 3,
+      "features": {
+        "attendance": false,
+        "grading": false,
+        "assignments": false,
+        "messaging": false,
+        "enrollment": false,
+        "results": false
+      }
+    },
+    "4": {
+      "ID": 4,
+      "name": "BRIGHT ACCADEMY",
+      "primaryColor": "#6c10b7",
+      "hasPrimary": true,
+      "hasSecondary": false,
+      "configJson": "{\"roles\":{\"admin\":true,\"teacher\":true,\"parent\":false,\"student\":false},\"modules\":{\"attendance\":true,\"gradebook\":true,\"finance\":true,\"messaging\":true,\"library\":false,\"transport\":false}}",
+      "adminId": 4,
+      "features": {
+        "attendance": false,
+        "grading": false,
+        "assignments": false,
+        "messaging": false,
+        "enrollment": false,
+        "results": false
+      }
+    },
+    "5": {
+      "ID": 5,
+      "name": "",
+      "primaryColor": "#10B981",
+      "hasPrimary": true,
+      "hasSecondary": true,
+      "configJson": "{\"roles\":{\"admin\":true,\"teacher\":true,\"parent\":true,\"student\":false},\"modules\":{\"attendance\":true,\"gradebook\":true,\"finance\":false,\"messaging\":true,\"library\":false,\"transport\":false}}",
+      "adminId": 5,
+      "features": {
+        "attendance": false,
+        "grading": false,
+        "assignments": false,
+        "messaging": false,
+        "enrollment": false,
+        "results": false
+      }
+    },
+    "6": {
+      "ID": 6,
+      "name": "GHS",
+      "primaryColor": "#109bb7",
+      "hasPrimary": true,
+      "hasSecondary": false,
+      "configJson": "{\"roles\":{\"admin\":true,\"teacher\":true,\"parent\":true,\"student\":false},\"modules\":{\"attendance\":true,\"gradebook\":true,\"finance\":true,\"messaging\":true,\"library\":true,\"transport\":true}}",
+      "adminId": 6,
+      "features": {
+        "attendance": false,
+        "grading": false,
+        "assignments": false,
+        "messaging": false,
+        "enrollment": false,
+        "results": false
+      }
+    },
+    "7": {
+      "ID": 7,
+      "name": "testing",
+      "primaryColor": "#b71098",
+      "hasPrimary": false,
+      "hasSecondary": true,
+      "configJson": "{\"roles\":{\"admin\":true,\"teacher\":true,\"parent\":true,\"student\":true},\"modules\":{\"attendance\":true,\"gradebook\":true,\"finance\":true,\"messaging\":true,\"library\":true,\"transport\":true}}",
+      "adminId": 10,
+      "features": {
+        "attendance": true,
+        "grading": true,
+        "assignments": true,
+        "messaging": true,
+        "enrollment": true,
+        "results": true
+      }
+    },
+    "8": {
+      "ID": 8,
+      "name": "MTN",
+      "primaryColor": "#10b761",
+      "hasPrimary": true,
+      "hasSecondary": true,
+      "configJson": "{\"roles\":{\"admin\":true,\"teacher\":true,\"parent\":true,\"student\":true},\"modules\":{\"attendance\":true,\"gradebook\":true,\"finance\":true,\"messaging\":true,\"library\":true,\"transport\":true}}",
+      "adminId": 14,
+      "features": {
+        "attendance": true,
+        "grading": true,
+        "assignments": true,
+        "messaging": true,
+        "enrollment": true,
+        "results": false
+      }
+    }
+  },
+  "users": {
+    "1": {
+      "ID": 1,
+      "schoolId": 1,
+      "name": "MR SAM ",
+      "email": "egembruno60@gmail.com",
+      "password": "BLACK@123",
+      "role": "Admin",
+      "firstLogin": false
+    },
+    "10": {
+      "ID": 10,
+      "schoolId": 7,
+      "name": "text",
+      "email": "text@gmail.com",
+      "password": "test123",
+      "role": "Admin",
+      "firstLogin": false
+    },
+    "11": {
+      "ID": 11,
+      "schoolId": 7,
+      "name": "student",
+      "email": "student@testing.edvance.com",
+      "password": "student123",
+      "role": "Student",
+      "firstLogin": false
+    },
+    "12": {
+      "ID": 12,
+      "schoolId": 7,
+      "name": "teacher",
+      "email": "teacher@testing.edvance.com",
+      "password": "teacher123",
+      "role": "Teacher",
+      "firstLogin": false
+    },
+    "14": {
+      "ID": 14,
+      "schoolId": 8,
+      "name": "na",
+      "email": "alex.m@edutrack.com",
+      "password": "black",
+      "role": "Admin",
+      "firstLogin": false
+    },
+    "17": {
+      "ID": 17,
+      "schoolId": 8,
+      "name": "alai",
+      "email": "alai@mtn.edvance.com",
+      "password": "welcome123",
+      "role": "Teacher",
+      "firstLogin": true
+    },
+    "18": {
+      "ID": 18,
+      "schoolId": 8,
+      "name": "Al",
+      "email": "al@mtn.edvance.com",
+      "password": "Black123",
+      "role": "Student",
+      "firstLogin": false
+    },
+    "19": {
+      "ID": 19,
+      "schoolId": 0,
+      "name": "james",
+      "email": "egem@gmail.com",
+      "password": "egem@123",
+      "role": "Parent",
+      "firstLogin": false
+    },
+    "2": {
+      "ID": 2,
+      "schoolId": 2,
+      "name": "MR SAM ",
+      "email": "egembruno60@gmail.com",
+      "password": "BLACK@123",
+      "role": "Admin",
+      "firstLogin": false
+    },
+    "20": {
+      "ID": 20,
+      "schoolId": 8,
+      "name": "ai",
+      "email": "ai@mtn.edvance.com",
+      "password": "ai@123",
+      "role": "Student",
+      "firstLogin": false
+    },
+    "3": {
+      "ID": 3,
+      "schoolId": 3,
+      "name": "MR SAM ",
+      "email": "egembruno60@gmail.com",
+      "password": "BLACK@123",
+      "role": "Admin",
+      "firstLogin": false
+    },
+    "4": {
+      "ID": 4,
+      "schoolId": 4,
+      "name": "John Wick",
+      "email": "bruno@gmail.com",
+      "password": "BLACK@123",
+      "role": "Admin",
+      "firstLogin": false
+    },
+    "5": {
+      "ID": 5,
+      "schoolId": 5,
+      "name": "",
+      "email": "",
+      "password": "",
+      "role": "Admin",
+      "firstLogin": false
+    },
+    "6": {
+      "ID": 6,
+      "schoolId": 6,
+      "name": "mr james",
+      "email": "bruno12@gmail.com",
+      "password": "Black@123",
+      "role": "Admin",
+      "firstLogin": false
+    },
+    "7": {
+      "ID": 7,
+      "schoolId": 6,
+      "name": "Egem-Otu Alain",
+      "email": "egem-otu.alain@ghs.edvance.com",
+      "password": "welcome123",
+      "role": "Student",
+      "firstLogin": true
+    },
+    "8": {
+      "ID": 8,
+      "schoolId": 6,
+      "name": "Symptom",
+      "email": "symptom@ghs.edvance.com",
+      "password": "Black@123",
+      "role": "Teacher",
+      "firstLogin": false
+    },
+    "9": {
+      "ID": 9,
+      "schoolId": 6,
+      "name": "Egem-Otu Alain",
+      "email": "egem-otu.alain1@ghs.edvance.com",
+      "password": "welcome123",
+      "role": "Student",
+      "firstLogin": true
+    }
+  },
+  "classes": {},
+  "parentLinks": [
+    {
+      "parentId": 19,
+      "studentId": 18
+    },
+    {
+      "parentId": 19,
+      "studentId": 20
+    },
+    {
+      "parentId": 19,
+      "studentId": 11
+    }
+  ],
+  "nextSID": 9,
+  "nextUID": 23,
+  "nextCID": 1
+}

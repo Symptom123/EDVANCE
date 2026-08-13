@@ -1,0 +1,633 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  LayoutDashboard, UserPlus, Users, GraduationCap, Settings,
+  LogOut, Building2, CheckCircle2, AlertCircle, Loader2,
+  Palette, Trash2, Plus, BookOpen, Shield, ToggleLeft,
+  ToggleRight, X, School, FileSpreadsheet, Upload, Download, FileText
+} from 'lucide-react';
+import { T, rgba, navItemStyle, cardStyle, inputStyle, btnStyle, badge } from '../styles/portalTheme';
+import ReportCardControls from '../components/ReportCardControls';
+import ReportCardView from '../components/ReportCardView';
+import * as XLSX from 'xlsx';
+
+const API = 'http://localhost:8080';
+
+export default function AdminDashboard() {
+  const navigate = useNavigate();
+  const [config, setConfig] = useState(null);
+  const [activeView, setActiveView] = useState('overview');
+  const [teachers, setTeachers] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [admins, setAdmins] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [showAddClass, setShowAddClass] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserRole, setNewUserRole] = useState('Teacher');
+  const [newClassName, setNewClassName] = useState('');
+  const [newClassSubject, setNewClassSubject] = useState('');
+  const [newClassYear, setNewClassYear] = useState('');
+  const [newClassTeacher, setNewClassTeacher] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formSuccess, setFormSuccess] = useState(null);
+  const [formError, setFormError] = useState(null);
+  const [settingsColor, setSettingsColor] = useState('#2563eb');
+  const [features, setFeatures] = useState({ attendance: true, grading: true, assignments: true, messaging: true, enrollment: true, results: true });
+  const [settingsSaved, setSettingsSaved] = useState(false);
+  const [genParentStudentEmail, setGenParentStudentEmail] = useState('');
+  const [genParentName, setGenParentName] = useState('');
+  const [genParentSuccess, setGenParentSuccess] = useState(null);
+  const [genParentError, setGenParentError] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [reportCardsData, setReportCardsData] = useState([]);
+  const [rcClassId, setRcClassId] = useState('');
+  const [rcTermId, setRcTermId] = useState('T1');
+  const [isFetchingRC, setIsFetchingRC] = useState(false);
+  const [uploadRCStatus, setUploadRCStatus] = useState(null);
+  const [isRCEditing, setIsRCEditing] = useState(false);
+  const [rcCustomFields, setRcCustomFields] = useState({});
+
+  useEffect(() => {
+    const raw = localStorage.getItem('edvance_school_config');
+    if (!raw) { navigate('/login'); return; }
+    try {
+      const p = JSON.parse(raw);
+      if (p.userRole !== 'Admin') { navigate('/login'); return; }
+      setConfig(p);
+      setSettingsColor(p.primaryColor || '#2563eb');
+      if (p.features) setFeatures(p.features);
+    } catch { navigate('/login'); }
+  }, [navigate]);
+
+  const fetchUsers = useCallback(async (role, setter) => {
+    if (!config) return;
+    try {
+      const res = await fetch(`${API}/api/users?schoolId=${config.schoolId}&role=${role}`);
+      setter(Array.isArray(await res.json()) ? await fetch(`${API}/api/users?schoolId=${config.schoolId}&role=${role}`).then(r => r.json()) : []);
+    } catch { setter([]); }
+  }, [config]);
+
+  const fetchClasses = useCallback(async () => {
+    if (!config) return;
+    try {
+      const data = await fetch(`${API}/api/classes?schoolId=${config.schoolId}`).then(r => r.json());
+      setClasses(Array.isArray(data) ? data : []);
+    } catch { setClasses([]); }
+  }, [config]);
+
+  useEffect(() => {
+    if (!config) return;
+    const load = async (role, setter) => {
+      try {
+        const data = await fetch(`${API}/api/users?schoolId=${config.schoolId}&role=${role}`).then(r => r.json());
+        setter(Array.isArray(data) ? data : []);
+      } catch { setter([]); }
+    };
+    load('Teacher', setTeachers);
+    load('Student', setStudents);
+    load('Admin', setAdmins);
+    fetchClasses();
+  }, [config, fetchClasses]);
+
+  if (!config) return <div style={{ background: T.pageBg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 size={28} color="#999" /></div>;
+
+  const accent = config.primaryColor || '#2563eb';
+
+  const reload = (role) => {
+    const load = async (r, setter) => {
+      try { const d = await fetch(`${API}/api/users?schoolId=${config.schoolId}&role=${r}`).then(res => res.json()); setter(Array.isArray(d) ? d : []); } catch { setter([]); }
+    };
+    if (role === 'Teacher') load('Teacher', setTeachers);
+    else if (role === 'Student') load('Student', setStudents);
+    else load('Admin', setAdmins);
+  };
+
+  const handleRegisterUser = async (e) => {
+    e.preventDefault(); setIsSubmitting(true); setFormError(null); setFormSuccess(null);
+    try {
+      const res = await fetch(`${API}/api/users`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schoolId: config.schoolId, name: newUserName, role: newUserRole }) });
+      if (!res.ok) throw new Error('Registration failed');
+      const data = await res.json();
+      setFormSuccess({ email: data.email, password: data.tempPassword, name: newUserName });
+      setNewUserName('');
+      reload(newUserRole);
+    } catch (err) { setFormError(err.message); } finally { setIsSubmitting(false); }
+  };
+
+  const handleDeleteUser = async (id, role) => {
+    if (!window.confirm('Remove this user?')) return;
+    try { await fetch(`${API}/api/users/${id}`, { method: 'DELETE' }); reload(role); } catch { alert('Delete failed'); }
+  };
+
+  const handleCreateClass = async (e) => {
+    e.preventDefault(); setIsSubmitting(true); setFormError(null);
+    try {
+      const teacher = teachers.find(t => t.name === newClassTeacher);
+      const res = await fetch(`${API}/api/classes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schoolId: config.schoolId, name: newClassName, subject: newClassSubject, year: newClassYear, teacherId: teacher ? teacher.id : 0 }) });
+      if (!res.ok) throw new Error('Failed');
+      setNewClassName(''); setNewClassSubject(''); setNewClassYear(''); setNewClassTeacher(''); setShowAddClass(false);
+      fetchClasses();
+    } catch (err) { setFormError(err.message); } finally { setIsSubmitting(false); }
+  };
+
+  const handleDeleteClass = async (id) => {
+    if (!window.confirm('Delete this class?')) return;
+    await fetch(`${API}/api/classes/${id}`, { method: 'DELETE' }); fetchClasses();
+  };
+
+  const handleSaveSettings = async () => {
+    try {
+      await fetch(`${API}/api/schools/${config.schoolId}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ primaryColor: settingsColor, features }) });
+      const updated = { ...config, primaryColor: settingsColor, features };
+      localStorage.setItem('edvance_school_config', JSON.stringify(updated));
+      setConfig(updated); setSettingsSaved(true); setTimeout(() => setSettingsSaved(false), 2500);
+    } catch { alert('Save failed'); }
+  };
+
+  const navItems = [
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'teachers', label: 'Manage Teachers', icon: Users },
+    { id: 'students', label: 'Manage Students', icon: GraduationCap },
+    { id: 'admins', label: 'Manage Admins', icon: Shield },
+    { id: 'parents', label: 'Parent Access', icon: Users },
+    { id: 'classes', label: 'Manage Classes', icon: BookOpen },
+    { id: 'reportcards', label: 'Report Cards', icon: FileText },
+    { id: 'features', label: 'Feature Settings', icon: ToggleRight },
+    { id: 'settings', label: 'School Settings', icon: Settings },
+  ];
+
+  const UserTable = ({ users, role }) => (
+    <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: `1px solid ${T.border}` }}>
+        <h3 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 20, margin: 0, color: T.text }}>{role}s <span style={{ color: T.muted, fontStyle: 'normal', fontFamily: T.fontSans, fontSize: 14 }}>({users.length})</span></h3>
+        <button onClick={() => { setNewUserRole(role); setShowAddUser(true); setFormSuccess(null); setFormError(null); }} style={btnStyle(accent)}>
+          <Plus size={15} /> Add {role}
+        </button>
+      </div>
+      {users.length === 0 ? (
+        <div style={{ padding: '48px', textAlign: 'center', color: T.muted }}>No {role.toLowerCase()}s registered yet.</div>
+      ) : (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: T.fontSans }}>
+          <thead><tr style={{ background: '#faf9f7' }}>{['Name', 'Email', 'Status', ''].map(h => <th key={h} style={{ padding: '10px 24px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: T.light, letterSpacing: '0.5px', textTransform: 'uppercase', borderBottom: `1px solid ${T.border}` }}>{h}</th>)}</tr></thead>
+          <tbody>{users.map(u => (
+            <tr key={u.id} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
+              <td style={{ padding: '14px 24px', fontWeight: 600, color: T.text }}>{u.name}</td>
+              <td style={{ padding: '14px 24px', color: T.muted, fontSize: 13 }}>{u.email}</td>
+              <td style={{ padding: '14px 24px' }}><span style={u.firstLogin ? badge('#d97706', '#fffbeb') : badge('#15803d', '#f0fdf4')}>{u.firstLogin ? 'Pending Login' : 'Active'}</span></td>
+              <td style={{ padding: '14px 24px' }}><button onClick={() => handleDeleteUser(u.id, role)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 500, fontFamily: T.fontSans }}><Trash2 size={13} /> Remove</button></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      )}
+    </div>
+  );
+
+  const AddUserForm = ({ role }) => showAddUser && newUserRole === role ? (
+    <div style={{ ...cardStyle, border: `1.5px solid ${rgba(accent, 0.3)}` }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
+        <h4 style={{ fontFamily: T.fontSans, fontWeight: 700, color: T.text, margin: 0 }}>Register New {role}</h4>
+        <button onClick={() => { setShowAddUser(false); setFormSuccess(null); setFormError(null); }} style={{ background: 'none', border: 'none', color: T.muted, cursor: 'pointer' }}><X size={18} /></button>
+      </div>
+      {formSuccess ? (
+        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: 20 }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12, color: '#15803d' }}><CheckCircle2 size={20} /><strong>Account Created!</strong></div>
+          <p style={{ color: T.muted, fontSize: 14, margin: '0 0 16px' }}>Share credentials securely with <strong style={{ color: T.text }}>{formSuccess.name}</strong>.</p>
+          <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 8, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div><p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: 1 }}>Email</p><strong style={{ color: T.text }}>{formSuccess.email}</strong></div>
+            <div><p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: 1 }}>Temp Password</p><strong style={{ color: T.text, fontFamily: 'monospace', fontSize: 15 }}>{formSuccess.password}</strong></div>
+          </div>
+          <button onClick={() => setFormSuccess(null)} style={{ ...btnStyle(accent), marginTop: 16 }}>Add Another</button>
+        </div>
+      ) : (
+        <form onSubmit={handleRegisterUser} style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Full Name</label>
+            <input type="text" required value={newUserName} onChange={e => setNewUserName(e.target.value)} placeholder="e.g. Jane Doe" style={inputStyle} />
+          </div>
+          {formError && <p style={{ color: '#ef4444', fontSize: 13, margin: 0 }}>{formError}</p>}
+          <button type="submit" disabled={isSubmitting} style={btnStyle(accent)}>{isSubmitting ? <Loader2 size={14} /> : <><Plus size={14} />Create</>}</button>
+        </form>
+      )}
+    </div>
+  ) : null;
+
+  const renderOverview = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      <div>
+        <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 8px' }}>Admin Dashboard</p>
+        <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 38, fontWeight: 400, margin: 0, color: T.text }}>Welcome, {config.name || 'Admin'}</h1>
+        <p style={{ color: T.muted, margin: '8px 0 0', fontSize: 15 }}>Here's what's happening at {config.schoolName} today.</p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+        {[{ label: 'Teachers', value: teachers.length, icon: Users, color: accent }, { label: 'Students', value: students.length, icon: GraduationCap, color: '#059669' }, { label: 'Classes', value: classes.length, icon: BookOpen, color: '#d97706' }, { label: 'Admins', value: admins.length, icon: Shield, color: '#7c3aed' }].map(stat => (
+          <div key={stat.label} style={{ ...cardStyle, borderTop: `3px solid ${stat.color}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <p style={{ color: T.muted, margin: 0, fontSize: 13, fontWeight: 500 }}>{stat.label}</p>
+              <div style={{ width: 34, height: 34, borderRadius: 8, background: rgba(stat.color, 0.1), display: 'flex', alignItems: 'center', justifyContent: 'center', color: stat.color }}><stat.icon size={16} /></div>
+            </div>
+            <p style={{ fontFamily: T.fontSerif, fontSize: 42, margin: 0, color: T.text, lineHeight: 1 }}>{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Performance SVG Chart */}
+      <div style={cardStyle}>
+        <p style={{ fontFamily: T.fontSans, fontWeight: 600, color: T.text, margin: '0 0 20px', fontSize: 15 }}>School Performance Trend</p>
+        <svg viewBox="0 0 700 160" style={{ width: '100%', display: 'block' }}>
+          <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={accent} stopOpacity="0.15" /><stop offset="100%" stopColor={accent} stopOpacity="0" /></linearGradient></defs>
+          {[0, 40, 80, 120, 160].map((y, i) => <line key={i} x1="0" y1={y} x2="700" y2={y} stroke={T.border} strokeWidth="1" />)}
+          <polyline fill="none" stroke={accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points="0,130 87.5,110 175,75 262.5,95 350,50 437.5,65 525,35 612.5,45 700,22" />
+          <polygon fill="url(#ag)" points="0,130 87.5,110 175,75 262.5,95 350,50 437.5,65 525,35 612.5,45 700,22 700,160 0,160" />
+          {[[0,130],[87.5,110],[175,75],[262.5,95],[350,50],[437.5,65],[525,35],[612.5,45],[700,22]].map(([x,y],i) => <circle key={i} cx={x} cy={y} r="5" fill={accent} stroke="white" strokeWidth="2" />)}
+        </svg>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>{['Wk1','Wk2','Wk3','Wk4','Wk5','Wk6','Wk7','Wk8','Wk9'].map(w => <span key={w} style={{ color: T.light, fontSize: 11, fontWeight: 500 }}>{w}</span>)}</div>
+      </div>
+
+      <div>
+        <p style={{ fontFamily: T.fontSans, fontWeight: 600, color: T.text, margin: '0 0 14px', fontSize: 15 }}>Quick Actions</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+          {[{ label: 'Add Teacher', icon: Users, role: 'Teacher', view: 'teachers' }, { label: 'Add Student', icon: GraduationCap, role: 'Student', view: 'students' }, { label: 'Add Class', icon: BookOpen, view: 'classes' }].map(item => (
+            <button key={item.label} onClick={() => { setActiveView(item.view); if (item.role) { setNewUserRole(item.role); setShowAddUser(true); } else setShowAddClass(true); }}
+              style={{ ...cardStyle, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 14, border: `1.5px solid ${rgba(accent, 0.25)}`, transition: 'all 0.15s' }}>
+              <div style={{ width: 42, height: 42, borderRadius: 10, background: rgba(accent, 0.1), display: 'flex', alignItems: 'center', justifyContent: 'center', color: accent, flexShrink: 0 }}><item.icon size={20} /></div>
+              <span style={{ fontWeight: 600, fontSize: 14, color: T.text }}>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderUserMgmt = (role, list) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div>
+        <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>User Management</p>
+        <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Manage {role}s</h1>
+      </div>
+      <AddUserForm role={role} />
+      <UserTable users={list} role={role} />
+    </div>
+  );
+
+  const renderClasses = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Curriculum</p>
+          <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Manage Classes</h1>
+        </div>
+        <button onClick={() => { setShowAddClass(true); setFormError(null); }} style={btnStyle(accent)}><Plus size={15} /> New Class</button>
+      </div>
+      {showAddClass && (
+        <div style={{ ...cardStyle, border: `1.5px solid ${rgba(accent, 0.3)}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
+            <h4 style={{ fontFamily: T.fontSans, fontWeight: 700, color: T.text, margin: 0 }}>Create Class</h4>
+            <button onClick={() => setShowAddClass(false)} style={{ background: 'none', border: 'none', color: T.muted, cursor: 'pointer' }}><X size={18} /></button>
+          </div>
+          <form onSubmit={handleCreateClass}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+              {[{ label: 'Class Name', val: newClassName, set: setNewClassName, ph: 'e.g. JSS 1A' }, { label: 'Subject', val: newClassSubject, set: setNewClassSubject, ph: 'e.g. Mathematics' }, { label: 'Year / Level', val: newClassYear, set: setNewClassYear, ph: 'e.g. Year 7' }].map(f => (
+                <div key={f.label}><label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>{f.label}</label><input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph} style={inputStyle} /></div>
+              ))}
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Assign Teacher</label>
+                <select value={newClassTeacher} onChange={e => setNewClassTeacher(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
+                  <option value="">-- Select --</option>
+                  {teachers.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+                </select>
+              </div>
+            </div>
+            {formError && <p style={{ color: '#ef4444', fontSize: 13, marginBottom: 10 }}>{formError}</p>}
+            <button type="submit" disabled={isSubmitting} style={btnStyle(accent)}>{isSubmitting ? <Loader2 size={14} /> : <><Plus size={14} />Create Class</>}</button>
+          </form>
+        </div>
+      )}
+      {classes.length === 0 ? (
+        <div style={{ ...cardStyle, textAlign: 'center', padding: '60px 24px', color: T.muted }}>
+          <BookOpen size={40} style={{ marginBottom: 12, opacity: 0.3 }} /><p>No classes yet. Create your first class above!</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+          {classes.map(cls => {
+            const teacher = teachers.find(t => t.id === cls.teacherId);
+            return (
+              <div key={cls.ID} style={{ ...cardStyle, borderTop: `3px solid ${accent}`, position: 'relative' }}>
+                <button onClick={() => handleDeleteClass(cls.ID)} style={{ position: 'absolute', top: 14, right: 14, background: '#fef2f2', border: 'none', borderRadius: 6, color: '#ef4444', cursor: 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center' }}><Trash2 size={13} /></button>
+                <h3 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 20, margin: '0 0 4px', color: T.text }}>{cls.name}</h3>
+                <p style={{ color: accent, margin: '0 0 14px', fontSize: 13, fontWeight: 600 }}>{cls.subject}</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {cls.year && <div style={{ display: 'flex', justifyContent: 'space-between', color: T.muted, fontSize: 13 }}><span>Year</span><strong style={{ color: T.text }}>{cls.year}</strong></div>}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: T.muted, fontSize: 13 }}><span>Teacher</span><strong style={{ color: T.text }}>{teacher ? teacher.name : '—'}</strong></div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderFeatures = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div>
+        <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Customization</p>
+        <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Feature Settings</h1>
+      </div>
+      <div style={{ ...cardStyle, maxWidth: 560 }}>
+        {Object.entries({ attendance: { label: 'Attendance Tracking', desc: 'Teachers take attendance; students view records.' }, grading: { label: 'Grading & Marks', desc: 'Teachers input grades; students view marks.' }, assignments: { label: 'Assignment System', desc: 'Teachers assign; students submit.' }, messaging: { label: 'Class Messaging', desc: 'Teachers send class-wide announcements.' }, enrollment: { label: 'Class Enrollment', desc: 'Students request to join classes.' }, results: { label: 'Results / Report Cards', desc: 'Students view full term results.' } }).map(([key, { label, desc }], idx, arr) => (
+          <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 0', borderBottom: idx < arr.length - 1 ? `1px solid ${T.borderLight}` : 'none' }}>
+            <div>
+              <p style={{ margin: 0, fontWeight: 600, color: T.text, fontSize: 14, marginBottom: 3 }}>{label}</p>
+              <p style={{ margin: 0, fontSize: 13, color: T.muted }}>{desc}</p>
+            </div>
+            <button onClick={() => setFeatures(f => ({ ...f, [key]: !f[key] }))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: features[key] ? accent : T.light, flexShrink: 0, marginLeft: 20 }}>
+              {features[key] ? <ToggleRight size={34} /> : <ToggleLeft size={34} />}
+            </button>
+          </div>
+        ))}
+        <div style={{ paddingTop: 20, borderTop: `1px solid ${T.border}`, marginTop: 4 }}>
+          <button onClick={handleSaveSettings} style={btnStyle(accent)}>{settingsSaved ? <><CheckCircle2 size={14} />Saved!</> : 'Save Feature Settings'}</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderSettings = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div>
+        <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Configuration</p>
+        <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>School Settings</h1>
+      </div>
+      <div style={{ ...cardStyle, maxWidth: 520 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div><label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>School Name</label><input style={{ ...inputStyle, background: '#f9f7f4', color: T.muted }} value={config.schoolName} readOnly /></div>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 10 }}>Primary Accent Color</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 48, height: 48, borderRadius: 10, background: settingsColor, border: `1px solid ${T.border}`, position: 'relative', cursor: 'pointer', overflow: 'hidden' }}>
+                <input type="color" value={settingsColor} onChange={e => setSettingsColor(e.target.value)} style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer' }} />
+              </div>
+              <div>
+                <p style={{ margin: 0, fontFamily: 'monospace', fontSize: 15, color: T.text }}>{settingsColor.toUpperCase()}</p>
+                <p style={{ margin: 0, fontSize: 12, color: T.muted }}>Click swatch to change</p>
+              </div>
+              <div style={{ flex: 1, height: 3, borderRadius: 100, background: `linear-gradient(to right, ${settingsColor}, transparent)`, opacity: 0.5 }} />
+            </div>
+          </div>
+          <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 20 }}>
+            <button onClick={handleSaveSettings} style={btnStyle(settingsColor)}>{settingsSaved ? <><CheckCircle2 size={14} />Saved!</> : 'Save Settings'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const handleGenerateParent = async (e) => {
+    e.preventDefault();
+    setIsGenerating(true); setGenParentError(null); setGenParentSuccess(null);
+    try {
+      const res = await fetch(`${API}/api/parents/generate`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentEmail: genParentStudentEmail, parentName: genParentName })
+      });
+      if (!res.ok) throw new Error((await res.text()) || 'Failed to generate');
+      setGenParentSuccess(await res.json());
+      setGenParentStudentEmail(''); setGenParentName('');
+    } catch (err) {
+      setGenParentError(err.message);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const renderParents = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div>
+        <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Access Control</p>
+        <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Generate Parent Link</h1>
+      </div>
+      <div style={{ ...cardStyle, maxWidth: 520 }}>
+        {genParentSuccess ? (
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: 20 }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12, color: '#15803d' }}><CheckCircle2 size={20} /><strong>Credentials Generated!</strong></div>
+            <p style={{ color: T.muted, fontSize: 14, margin: '0 0 16px' }}>Give these temporary credentials to the parent. They will set a permanent email and password on their first login.</p>
+            <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 8, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div><p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: 1 }}>Temp Email</p><strong style={{ color: T.text }}>{genParentSuccess.email}</strong></div>
+              <div><p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: 1 }}>Temp Password</p><strong style={{ color: T.text, fontFamily: 'monospace', fontSize: 15 }}>{genParentSuccess.password}</strong></div>
+            </div>
+            <button onClick={() => setGenParentSuccess(null)} style={{ ...btnStyle(accent), marginTop: 16 }}>Generate Another</button>
+          </div>
+        ) : (
+          <form onSubmit={handleGenerateParent} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <p style={{ margin: '0 0 8px', color: T.muted, fontSize: 14 }}>Link a parent to a student's account by providing the student's email and the parent's full name.</p>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Student's Email</label>
+              <input type="email" required value={genParentStudentEmail} onChange={e => setGenParentStudentEmail(e.target.value)} placeholder="student@example.com" style={inputStyle} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Parent's Full Name</label>
+              <input type="text" required value={genParentName} onChange={e => setGenParentName(e.target.value)} placeholder="e.g. Richard Doe" style={inputStyle} />
+            </div>
+            {genParentError && <p style={{ color: '#ef4444', fontSize: 13, margin: 0 }}>⚠️ {genParentError}</p>}
+            <button type="submit" disabled={isGenerating} style={{ ...btnStyle(accent), alignSelf: 'flex-start' }}>{isGenerating ? <Loader2 size={14} /> : <><Users size={14} />Generate Credentials</>}</button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+
+  const handleFetchReportCards = async () => {
+    if (!rcClassId || !rcTermId) return;
+    setIsFetchingRC(true);
+    try {
+      const res = await fetch(`${API}/api/report-cards/class/${rcClassId}?term_id=${rcTermId}`);
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setReportCardsData(data || []);
+    } catch {
+      setReportCardsData([]);
+    } finally {
+      setIsFetchingRC(false);
+    }
+  };
+
+  const handlePrintRC = () => {
+    window.print();
+  };
+
+  const handleExcelTemplateDownload = () => {
+    const ws = XLSX.utils.json_to_sheet([{ studentId: '', subject: '', mark: '', coefficient: '' }]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Marks");
+    XLSX.writeFile(wb, "marks_template.xlsx");
+  };
+
+  const handleExcelUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+        
+        setUploadRCStatus('Uploading...');
+        const res = await fetch(`${API}/api/grades/bulk`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ marks: data, classId: rcClassId, termId: rcTermId })
+        });
+        if (res.ok) {
+          setUploadRCStatus('Upload successful!');
+          setTimeout(() => setUploadRCStatus(null), 3000);
+          handleFetchReportCards();
+        } else {
+          setUploadRCStatus('Upload failed.');
+        }
+      } catch (err) {
+        setUploadRCStatus('Error reading file.');
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const renderReportCards = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className="print-hide">
+        <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Academic Results</p>
+        <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Report Cards</h1>
+      </div>
+      
+      <div className="print-hide" style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Select Class</label>
+            <select value={rcClassId} onChange={e => setRcClassId(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
+              <option value="">-- Choose Class --</option>
+              {classes.map(c => <option key={c.ID || c.id} value={c.ID || c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Term</label>
+            <select value={rcTermId} onChange={e => setRcTermId(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
+              <option value="T1">First Term (T1)</option>
+              <option value="T2">Second Term (T2)</option>
+              <option value="T3">Third Term (T3)</option>
+            </select>
+          </div>
+          <button onClick={handleFetchReportCards} disabled={isFetchingRC} style={btnStyle(accent)}>
+            {isFetchingRC ? <Loader2 size={15} /> : 'Fetch Report Cards'}
+          </button>
+        </div>
+        
+        <div style={{ borderTop: `1px solid ${T.borderLight}`, paddingTop: 16, display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button onClick={handleExcelTemplateDownload} style={{ ...btnStyle('#10b981'), background: 'transparent', color: '#10b981', border: '1px solid #10b981' }}>
+            <Download size={14} /> Download Template
+          </button>
+          
+          <label style={{ ...btnStyle('#10b981'), cursor: 'pointer', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Upload size={14} /> Upload Marks
+            <input type="file" accept=".xlsx, .xls" style={{ display: 'none' }} onChange={handleExcelUpload} />
+          </label>
+          {uploadRCStatus && <span style={{ fontSize: 13, color: T.text }}>{uploadRCStatus}</span>}
+        </div>
+      </div>
+
+      {reportCardsData.length > 0 && (
+        <>
+          <ReportCardControls
+            accent={accent}
+            onPrint={handlePrintRC}
+            isEditing={isRCEditing}
+            onToggleEdit={() => setIsRCEditing(v => !v)}
+            customFields={rcCustomFields}
+            onFieldChange={(key, val) => setRcCustomFields(prev => ({ ...prev, [key]: val }))}
+          />
+          <div className="print-main">
+            <ReportCardView
+              reportCards={reportCardsData}
+              accent={accent}
+              config={config}
+              isEditing={isRCEditing}
+              customFields={rcCustomFields}
+              onFieldChange={(key, val) => setRcCustomFields(prev => ({ ...prev, [key]: val }))}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  const renderContent = () => {
+    switch (activeView) {
+      case 'overview': return renderOverview();
+      case 'teachers': return renderUserMgmt('Teacher', teachers);
+      case 'students': return renderUserMgmt('Student', students);
+      case 'admins': return renderUserMgmt('Admin', admins);
+      case 'parents': return renderParents();
+      case 'classes': return renderClasses();
+      case 'reportcards': return renderReportCards();
+      case 'features': return renderFeatures();
+      case 'settings': return renderSettings();
+      default: return renderOverview();
+    }
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', background: T.pageBg, fontFamily: T.fontSans }}>
+      {/* SIDEBAR */}
+      <div className="print-hide" style={{ width: 256, background: T.sidebarBg, borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 0, height: '100vh' }}>
+        <div style={{ padding: '28px 20px 24px', borderBottom: `1px solid ${T.borderLight}` }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <img src="/logo.png" alt="Edvance Logo" style={{ height: 48, objectFit: 'contain', alignSelf: 'flex-start' }} />
+            <span style={{ fontSize: 11, color: T.light, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Admin Portal</span>
+          </div>
+        </div>
+        <nav style={{ flex: 1, padding: '12px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {navItems.map(item => (
+            <button key={item.id} onClick={() => { setActiveView(item.id); setShowAddUser(false); setShowAddClass(false); }} style={navItemStyle(activeView === item.id, accent)}>
+              <item.icon size={17} /> {item.label}
+            </button>
+          ))}
+        </nav>
+        <div style={{ padding: '16px 12px', borderTop: `1px solid ${T.borderLight}` }}>
+          <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444'), color: '#ef4444' }}><LogOut size={17} /> Sign Out</button>
+        </div>
+      </div>
+
+      {/* MAIN */}
+      <div className="print-main" style={{ flex: 1, padding: '48px 52px', overflowY: 'auto' }}>{renderContent()}</div>
+
+      {/* RIGHT PANEL */}
+      <div className="print-hide" style={{ width: 264, background: T.sidebarBg, borderLeft: `1px solid ${T.border}`, padding: '28px 20px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 24, position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
+        <div style={{ textAlign: 'center', paddingBottom: 20, borderBottom: `1px solid ${T.borderLight}` }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: rgba(accent, 0.1), border: `2px solid ${rgba(accent, 0.3)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 26, color: accent }}>{(config.name || 'A').charAt(0)}</div>
+          <p style={{ margin: '0 0 4px', fontWeight: 700, color: T.text, fontSize: 15 }}>{config.name || 'Admin'}</p>
+          <span style={badge(accent, rgba(accent, 0.1))}>Super Admin</span>
+          <p style={{ margin: '8px 0 0', fontSize: 12, color: T.light }}>{config.email || ''}</p>
+        </div>
+        <div>
+          <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '1px' }}>School Stats</p>
+          {[{ label: 'Teachers', value: teachers.length }, { label: 'Students', value: students.length }, { label: 'Classes', value: classes.length }].map(s => (
+            <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${T.borderLight}` }}>
+              <span style={{ color: T.muted, fontSize: 13 }}>{s.label}</span>
+              <strong style={{ color: T.text }}>{s.value}</strong>
+            </div>
+          ))}
+        </div>
+        <div>
+          <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '1px' }}>Accent Color</p>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: accent, border: `1px solid ${T.border}` }} />
+            <span style={{ fontFamily: 'monospace', fontSize: 13, color: T.muted }}>{accent.toUpperCase()}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
