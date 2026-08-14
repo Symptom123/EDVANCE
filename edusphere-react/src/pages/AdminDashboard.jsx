@@ -21,8 +21,11 @@ export default function AdminDashboard() {
   const [students, setStudents] = useState([]);
   const [admins, setAdmins] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [sequences, setSequences] = useState([]);
   const [showAddUser, setShowAddUser] = useState(false);
   const [showAddClass, setShowAddClass] = useState(false);
+  const [showAddSequence, setShowAddSequence] = useState(false);
+  const [newSequenceName, setNewSequenceName] = useState('');
   const [newUserName, setNewUserName] = useState('');
   const [newUserRole, setNewUserRole] = useState('Teacher');
   const [newClassName, setNewClassName] = useState('');
@@ -47,6 +50,22 @@ export default function AdminDashboard() {
   const [uploadRCStatus, setUploadRCStatus] = useState(null);
   const [isRCEditing, setIsRCEditing] = useState(false);
   const [rcCustomFields, setRcCustomFields] = useState({});
+  const [dashboardStats, setDashboardStats] = useState({ teachers: 0, students: 0, classes: 0, marksEntered: 0, avgScore: '0' });
+  const [enrollClassId, setEnrollClassId] = useState('');
+  const [enrollStudentId, setEnrollStudentId] = useState('');
+  const [enrollments, setEnrollments] = useState([]);
+  const [enrollMsg, setEnrollMsg] = useState('');
+  const [allUsers, setAllUsers] = useState([]);
+  const [msgRecipient, setMsgRecipient] = useState('');
+  const [msgSubject, setMsgSubject] = useState('');
+  const [msgBody, setMsgBody] = useState('');
+  const [messages, setMessages] = useState([]);
+  const [msgSent, setMsgSent] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [rosterClass, setRosterClass] = useState(null);
+  const [rosterEnrollments, setRosterEnrollments] = useState([]);
+  const [rosterStudentId, setRosterStudentId] = useState('');
+  const [rosterLoading, setRosterLoading] = useState(false);
 
   useEffect(() => {
     const raw = localStorage.getItem('edvance_school_config');
@@ -76,6 +95,14 @@ export default function AdminDashboard() {
     } catch { setClasses([]); }
   }, [config]);
 
+  const fetchSequences = useCallback(async () => {
+    if (!config) return;
+    try {
+      const data = await fetch(`${API}/api/sequences?schoolId=${config.schoolId}`).then(r => r.json());
+      setSequences(Array.isArray(data) ? data : []);
+    } catch { setSequences([]); }
+  }, [config]);
+
   useEffect(() => {
     if (!config) return;
     const load = async (role, setter) => {
@@ -88,7 +115,17 @@ export default function AdminDashboard() {
     load('Student', setStudents);
     load('Admin', setAdmins);
     fetchClasses();
-  }, [config, fetchClasses]);
+    fetchSequences();
+    // Fetch real dashboard stats
+    fetch(`${API}/api/dashboard/admin/${config.schoolId}`)
+      .then(r => r.json()).then(d => setDashboardStats(d || {})).catch(() => {});
+    // Fetch all users for messaging
+    fetch(`${API}/api/users?schoolId=${config.schoolId}`)
+      .then(r => r.json()).then(d => setAllUsers(Array.isArray(d) ? d : [])).catch(() => {});
+    // Fetch admin inbox
+    fetch(`${API}/api/messages?userId=${config.id}&box=inbox`)
+      .then(r => r.json()).then(d => setMessages(Array.isArray(d) ? d : [])).catch(() => {});
+  }, [config, fetchClasses, fetchSequences]);
 
   if (!config) return <div style={{ background: T.pageBg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 size={28} color="#999" /></div>;
 
@@ -152,6 +189,9 @@ export default function AdminDashboard() {
     { id: 'admins', label: 'Manage Admins', icon: Shield },
     { id: 'parents', label: 'Parent Access', icon: Users },
     { id: 'classes', label: 'Manage Classes', icon: BookOpen },
+    { id: 'enrollment', label: 'Enrollment', icon: UserPlus },
+    { id: 'sequences', label: 'Manage Sequences', icon: ToggleRight },
+    { id: 'messages', label: 'Messaging', icon: FileSpreadsheet },
     { id: 'reportcards', label: 'Report Cards', icon: FileText },
     { id: 'features', label: 'Feature Settings', icon: ToggleRight },
     { id: 'settings', label: 'School Settings', icon: Settings },
@@ -221,7 +261,12 @@ export default function AdminDashboard() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-        {[{ label: 'Teachers', value: teachers.length, icon: Users, color: accent }, { label: 'Students', value: students.length, icon: GraduationCap, color: '#059669' }, { label: 'Classes', value: classes.length, icon: BookOpen, color: '#d97706' }, { label: 'Admins', value: admins.length, icon: Shield, color: '#7c3aed' }].map(stat => (
+        {[
+          { label: 'Teachers', value: dashboardStats.teachers ?? teachers.length, icon: Users, color: accent },
+          { label: 'Students', value: dashboardStats.students ?? students.length, icon: GraduationCap, color: '#059669' },
+          { label: 'Classes', value: dashboardStats.classes ?? classes.length, icon: BookOpen, color: '#d97706' },
+          { label: 'Marks Entered', value: dashboardStats.marksEntered ?? 0, icon: Shield, color: '#7c3aed' }
+        ].map(stat => (
           <div key={stat.label} style={{ ...cardStyle, borderTop: `3px solid ${stat.color}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <p style={{ color: T.muted, margin: 0, fontSize: 13, fontWeight: 500 }}>{stat.label}</p>
@@ -316,14 +361,155 @@ export default function AdminDashboard() {
               <div key={cls.ID} style={{ ...cardStyle, borderTop: `3px solid ${accent}`, position: 'relative' }}>
                 <button onClick={() => handleDeleteClass(cls.ID)} style={{ position: 'absolute', top: 14, right: 14, background: '#fef2f2', border: 'none', borderRadius: 6, color: '#ef4444', cursor: 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center' }}><Trash2 size={13} /></button>
                 <h3 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 20, margin: '0 0 4px', color: T.text }}>{cls.name}</h3>
-                <p style={{ color: accent, margin: '0 0 14px', fontSize: 13, fontWeight: 600 }}>{cls.subject}</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
                   {cls.year && <div style={{ display: 'flex', justifyContent: 'space-between', color: T.muted, fontSize: 13 }}><span>Year</span><strong style={{ color: T.text }}>{cls.year}</strong></div>}
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: T.muted, fontSize: 13 }}><span>Teacher</span><strong style={{ color: T.text }}>{teacher ? teacher.name : '—'}</strong></div>
                 </div>
+                <button
+                  onClick={async () => {
+                    const classId = cls.id || cls.ID;
+                    setRosterClass(cls);
+                    setRosterLoading(true);
+                    try {
+                      const res = await fetch(`${API}/api/enrollments?classId=${classId}&schoolId=${config.schoolId}`);
+                      setRosterEnrollments(await res.json() || []);
+                    } catch { setRosterEnrollments([]); }
+                    finally { setRosterLoading(false); }
+                  }}
+                  style={{ ...btnStyle(accent, true), width: '100%', justifyContent: 'center', fontSize: 12, padding: '8px' }}
+                >
+                  <Users size={14} /> Manage Students / Roster
+                </button>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ROSTER MODAL */}
+      {rosterClass && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          <div style={{ ...cardStyle, width: '100%', maxWidth: 540, padding: 28, position: 'relative', maxHeight: '85vh', overflowY: 'auto' }}>
+            <button onClick={() => setRosterClass(null)} style={{ position: 'absolute', top: 20, right: 20, background: 'none', border: 'none', cursor: 'pointer', color: T.muted }}><X size={20} /></button>
+            <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 4px', fontSize: 24, color: T.text }}>Class Roster: {rosterClass.name}</h2>
+            <p style={{ color: accent, fontSize: 13, fontWeight: 600, margin: '0 0 20px' }}>{rosterClass.subject} ({rosterClass.year || 'No level'})</p>
+
+            <div style={{ marginBottom: 20, background: '#faf9f7', padding: 14, borderRadius: 8, border: `1px solid ${T.border}` }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: T.text, marginBottom: 6 }}>Add Student to Class</label>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <select value={rosterStudentId} onChange={e => setRosterStudentId(e.target.value)} style={{ ...inputStyle, flex: 1, background: '#fff' }}>
+                  <option value="">-- Choose Student --</option>
+                  {students.filter(s => !rosterEnrollments.some(re => re.studentId === s.id)).map(s => (
+                    <option key={s.id} value={s.id}>{s.name} ({s.email})</option>
+                  ))}
+                </select>
+                <button
+                  onClick={async () => {
+                    if (!rosterStudentId) return;
+                    const classId = rosterClass.id || rosterClass.ID;
+                    await fetch(`${API}/api/enrollments`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ schoolId: config.schoolId, classId, studentId: rosterStudentId })
+                    });
+                    setRosterStudentId('');
+                    const res = await fetch(`${API}/api/enrollments?classId=${classId}&schoolId=${config.schoolId}`);
+                    setRosterEnrollments(await res.json() || []);
+                  }}
+                  style={btnStyle(accent)}
+                >
+                  <Plus size={14} /> Add
+                </button>
+              </div>
+            </div>
+
+            <h4 style={{ fontFamily: T.fontSans, fontWeight: 700, fontSize: 14, color: T.text, margin: '0 0 10px' }}>Enrolled Students ({rosterEnrollments.length})</h4>
+            {rosterLoading ? <p style={{ fontSize: 13, color: T.muted }}>Loading roster...</p> : rosterEnrollments.length === 0 ? (
+              <p style={{ fontSize: 13, color: T.muted, fontStyle: 'italic' }}>No students enrolled in this class yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {rosterEnrollments.map(e => (
+                  <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: 8, background: '#fff', border: `1px solid ${T.borderLight}` }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{e.studentName}</span>
+                    <button
+                      onClick={async () => {
+                        const classId = rosterClass.id || rosterClass.ID;
+                        await fetch(`${API}/api/enrollments?classId=${classId}&studentId=${e.studentId}`, { method: 'DELETE' });
+                        const res = await fetch(`${API}/api/enrollments?classId=${classId}&schoolId=${config.schoolId}`);
+                        setRosterEnrollments(await res.json() || []);
+                      }}
+                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
+                    >
+                      <Trash2 size={13} /> Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+  
+  const handleCreateSequence = async (e) => {
+    e.preventDefault(); setIsSubmitting(true); setFormError(null);
+    try {
+      const res = await fetch(`${API}/api/sequences`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schoolId: config.schoolId, name: newSequenceName }) });
+      if (!res.ok) throw new Error('Failed');
+      setNewSequenceName(''); setShowAddSequence(false);
+      fetchSequences();
+    } catch (err) { setFormError(err.message); } finally { setIsSubmitting(false); }
+  };
+
+  const handleToggleSequenceLock = async (id, currentLocked) => {
+    try {
+      await fetch(`${API}/api/sequences/lock`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, isLocked: !currentLocked }) });
+      fetchSequences();
+    } catch { alert('Update failed'); }
+  };
+
+  const renderSequences = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Evaluation</p>
+          <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Manage Sequences</h1>
+        </div>
+        <button onClick={() => { setShowAddSequence(true); setFormError(null); }} style={btnStyle(accent)}><Plus size={15} /> New Sequence</button>
+      </div>
+      {showAddSequence && (
+        <div style={{ ...cardStyle, border: `1.5px solid ${rgba(accent, 0.3)}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
+            <h4 style={{ fontFamily: T.fontSans, fontWeight: 700, color: T.text, margin: 0 }}>Create Sequence</h4>
+            <button onClick={() => setShowAddSequence(false)} style={{ background: 'none', border: 'none', color: T.muted, cursor: 'pointer' }}><X size={18} /></button>
+          </div>
+          <form onSubmit={handleCreateSequence}>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Sequence Name</label>
+              <input value={newSequenceName} onChange={e => setNewSequenceName(e.target.value)} placeholder="e.g. First Sequence" style={inputStyle} required />
+            </div>
+            {formError && <p style={{ color: '#ef4444', fontSize: 13, marginBottom: 10 }}>{formError}</p>}
+            <button type="submit" disabled={isSubmitting} style={btnStyle(accent)}>{isSubmitting ? <Loader2 size={14} /> : <><Plus size={14} />Create Sequence</>}</button>
+          </form>
+        </div>
+      )}
+      {sequences.length === 0 ? (
+        <div style={{ ...cardStyle, textAlign: 'center', padding: '60px 24px', color: T.muted }}>
+          <p>No sequences found. Please create one.</p>
+        </div>
+      ) : (
+        <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: T.fontSans }}>
+            <thead><tr style={{ background: '#faf9f7' }}>{['Sequence Name', 'Status', 'Action'].map(h => <th key={h} style={{ padding: '14px 24px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: T.light, letterSpacing: '0.5px', textTransform: 'uppercase', borderBottom: `1px solid ${T.border}` }}>{h}</th>)}</tr></thead>
+            <tbody>{sequences.map(seq => (
+              <tr key={seq.id} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
+                <td style={{ padding: '14px 24px', fontWeight: 600, color: T.text }}>{seq.name}</td>
+                <td style={{ padding: '14px 24px' }}><span style={seq.isLocked ? badge('#dc2626', '#fef2f2') : badge('#15803d', '#f0fdf4')}>{seq.isLocked ? 'Locked' : 'Open'}</span></td>
+                <td style={{ padding: '14px 24px' }}><button onClick={() => handleToggleSequenceLock(seq.id, seq.isLocked)} style={{ background: 'none', border: 'none', color: accent, cursor: 'pointer', fontWeight: 600, fontSize: 13, fontFamily: T.fontSans }}>{seq.isLocked ? 'Unlock' : 'Lock'}</button></td>
+              </tr>
+            ))}</tbody>
+          </table>
         </div>
       )}
     </div>
@@ -513,11 +699,11 @@ export default function AdminDashboard() {
             </select>
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Term</label>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Term/Annual</label>
             <select value={rcTermId} onChange={e => setRcTermId(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
-              <option value="T1">First Term (T1)</option>
-              <option value="T2">Second Term (T2)</option>
-              <option value="T3">Third Term (T3)</option>
+              <option value="T1">Term 1</option>
+              <option value="T2">Term 2</option>
+              <option value="Annual">Annual Average</option>
             </select>
           </div>
           <button onClick={handleFetchReportCards} disabled={isFetchingRC} style={btnStyle(accent)}>
@@ -563,6 +749,145 @@ export default function AdminDashboard() {
     </div>
   );
 
+  const renderEnrollment = () => {
+    const fetchClassEnrollments = async (classId) => {
+      if (!classId) return;
+      try {
+        const data = await fetch(`${API}/api/enrollments?classId=${classId}&schoolId=${config.schoolId}`).then(r => r.json());
+        setEnrollments(Array.isArray(data) ? data : []);
+      } catch { setEnrollments([]); }
+    };
+    const handleEnroll = async () => {
+      if (!enrollClassId || !enrollStudentId) { setEnrollMsg('Please select both a class and a student.'); return; }
+      try {
+        const res = await fetch(`${API}/api/enrollments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schoolId: config.schoolId, classId: enrollClassId, studentId: enrollStudentId }) });
+        if (!res.ok) throw new Error('Enrollment failed');
+        setEnrollMsg('Student enrolled successfully!');
+        fetchClassEnrollments(enrollClassId);
+        setTimeout(() => setEnrollMsg(''), 3000);
+      } catch (err) { setEnrollMsg('Error: ' + err.message); }
+    };
+    const handleUnenroll = async (classId, studentId) => {
+      if (!window.confirm('Remove this student from the class?')) return;
+      await fetch(`${API}/api/enrollments?classId=${classId}&studentId=${studentId}`, { method: 'DELETE' });
+      fetchClassEnrollments(enrollClassId);
+    };
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div><p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Class Management</p><h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Student Enrollment</h1></div>
+        <div style={{ ...cardStyle }}>
+          <p style={{ fontWeight: 600, color: T.text, margin: '0 0 16px' }}>Enroll a Student in a Class</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, alignItems: 'flex-end' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Select Class</label>
+              <select value={enrollClassId} onChange={e => { setEnrollClassId(e.target.value); setTimeout(() => {}, 0); }} style={{ ...inputStyle, background: '#fff' }}>
+                <option value="">-- Choose Class --</option>
+                {classes.map(c => <option key={c.ID || c.id} value={c.ID || c.id}>{c.name} ({c.subject})</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Select Student</label>
+              <select value={enrollStudentId} onChange={e => setEnrollStudentId(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
+                <option value="">-- Choose Student --</option>
+                {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <button onClick={handleEnroll} style={btnStyle(accent)}><Plus size={15} />Enroll</button>
+          </div>
+          {enrollMsg && <p style={{ marginTop: 10, fontSize: 13, color: enrollMsg.includes('Error') ? '#ef4444' : '#15803d', fontWeight: 500 }}>{enrollMsg}</p>}
+        </div>
+        <div style={{ ...cardStyle }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <p style={{ fontWeight: 600, color: T.text, margin: 0 }}>Current Enrollments</p>
+            <select value={enrollClassId} onChange={e => { setEnrollClassId(e.target.value); fetchClassEnrollments(e.target.value); }} style={{ ...inputStyle, background: '#fff', maxWidth: 220 }}>
+              <option value="">-- Select class to view --</option>
+              {classes.map(c => <option key={c.ID || c.id} value={c.ID || c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          {enrollments.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: T.muted }}>{enrollClassId ? 'No students enrolled in this class yet.' : 'Select a class to view enrollments.'}</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: T.fontSans }}>
+              <thead><tr style={{ background: '#faf9f7' }}>
+                {['Student Name', 'Class', ''].map(h => <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: T.light, textTransform: 'uppercase', borderBottom: `1px solid ${T.border}` }}>{h}</th>)}
+              </tr></thead>
+              <tbody>{enrollments.map(e => (
+                <tr key={e.id} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
+                  <td style={{ padding: '12px 16px', fontWeight: 600, color: T.text }}>{e.studentName}</td>
+                  <td style={{ padding: '12px 16px', color: T.muted, fontSize: 13 }}>{e.className}</td>
+                  <td style={{ padding: '12px 16px' }}><button onClick={() => handleUnenroll(e.classId, e.studentId)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 13, fontWeight: 500, fontFamily: T.fontSans, display: 'flex', alignItems: 'center', gap: 4 }}><Trash2 size={13} />Remove</button></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderMessages = () => {
+    const handleSendMsg = async (e) => {
+      e.preventDefault();
+      if (!msgRecipient || !msgSubject || !msgBody) { return; }
+      try {
+        await fetch(`${API}/api/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schoolId: config.schoolId, senderId: config.id, senderName: config.name, senderRole: 'Admin', recipientId: msgRecipient, subject: msgSubject, body: msgBody }) });
+        setMsgSent(true); setMsgRecipient(''); setMsgSubject(''); setMsgBody('');
+        setTimeout(() => setMsgSent(false), 3000);
+      } catch { alert('Failed to send'); }
+    };
+    const handleMarkRead = async (id) => {
+      await fetch(`${API}/api/messages/${id}/read`, { method: 'PUT' });
+      setMessages(msgs => msgs.map(m => m.id === id ? { ...m, isRead: true } : m));
+    };
+    const unread = messages.filter(m => !m.isRead).length;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div><p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Communications</p><h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Messaging {unread > 0 && <span style={{ fontSize: 16, fontFamily: T.fontSans, background: '#ef4444', color: '#fff', borderRadius: '100px', padding: '2px 10px', marginLeft: 8 }}>{unread}</span>}</h1></div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          <div style={{ ...cardStyle }}>
+            <p style={{ fontWeight: 700, color: T.text, margin: '0 0 16px', fontFamily: T.fontSans }}>Compose Message</p>
+            {msgSent ? <div style={{ background: '#f0fdf4', color: '#15803d', padding: 14, borderRadius: 8, fontWeight: 500 }}>✓ Message sent!</div> : (
+              <form onSubmit={handleSendMsg} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div><label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Recipient</label>
+                  <select value={msgRecipient} onChange={e => setMsgRecipient(e.target.value)} style={{ ...inputStyle, background: '#fff' }} required>
+                    <option value="">-- Select User --</option>
+                    {allUsers.filter(u => u.id !== config.id).map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                  </select></div>
+                <div><label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Subject</label><input value={msgSubject} onChange={e => setMsgSubject(e.target.value)} placeholder="Subject" style={inputStyle} required /></div>
+                <div><label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Message</label><textarea value={msgBody} onChange={e => setMsgBody(e.target.value)} rows={4} placeholder="Write your message..." style={{ ...inputStyle, resize: 'vertical' }} required /></div>
+                <button type="submit" style={btnStyle(accent)}>Send Message</button>
+              </form>
+            )}
+          </div>
+          <div style={{ ...cardStyle }}>
+            <p style={{ fontWeight: 700, color: T.text, margin: '0 0 16px', fontFamily: T.fontSans }}>Inbox {unread > 0 && <span style={{ fontSize: 12, background: '#ef4444', color: '#fff', borderRadius: '100px', padding: '1px 8px', marginLeft: 6 }}>{unread}</span>}</p>
+            {messages.length === 0 ? <div style={{ textAlign: 'center', padding: '40px', color: T.muted }}>No messages yet.</div> : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {messages.map(msg => (
+                  <div key={msg.id} onClick={() => { setSelectedMessage(msg); if (!msg.isRead) handleMarkRead(msg.id); }} style={{ padding: '12px 14px', borderRadius: 8, border: `1.5px solid ${msg.isRead ? T.borderLight : rgba(accent, 0.3)}`, cursor: 'pointer', background: msg.isRead ? '#fff' : rgba(accent, 0.03), transition: 'all 0.15s' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <strong style={{ fontSize: 13, color: T.text }}>{msg.senderName}</strong>
+                      <span style={{ fontSize: 11, color: T.light }}>{msg.createdAt ? new Date(msg.createdAt).toLocaleDateString() : ''}</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: 13, color: msg.isRead ? T.muted : T.text, fontWeight: msg.isRead ? 400 : 600 }}>{msg.subject}</p>
+                    {!msg.isRead && <div style={{ width: 8, height: 8, borderRadius: '50%', background: accent, marginTop: 6 }} />}
+                  </div>
+                ))}
+              </div>
+            )}
+            {selectedMessage && (
+              <div style={{ marginTop: 16, padding: '16px', borderRadius: 8, background: '#faf9f7', border: `1px solid ${T.border}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><strong style={{ color: T.text }}>{selectedMessage.subject}</strong><button onClick={() => setSelectedMessage(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted }}><X size={15} /></button></div>
+                <p style={{ fontSize: 12, color: T.muted, margin: '0 0 10px' }}>From: {selectedMessage.senderName} ({selectedMessage.senderRole})</p>
+                <p style={{ fontSize: 14, color: T.text, lineHeight: 1.6, margin: 0 }}>{selectedMessage.body}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderContent = () => {
     switch (activeView) {
       case 'overview': return renderOverview();
@@ -571,12 +896,16 @@ export default function AdminDashboard() {
       case 'admins': return renderUserMgmt('Admin', admins);
       case 'parents': return renderParents();
       case 'classes': return renderClasses();
+      case 'enrollment': return renderEnrollment();
+      case 'sequences': return renderSequences();
+      case 'messages': return renderMessages();
       case 'reportcards': return renderReportCards();
       case 'features': return renderFeatures();
       case 'settings': return renderSettings();
       default: return renderOverview();
     }
   };
+
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: T.pageBg, fontFamily: T.fontSans }}>

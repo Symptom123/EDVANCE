@@ -41,6 +41,47 @@ VALUES
 ('link-3', '19', '11')
 ON CONFLICT (id) DO NOTHING;
 
+CREATE TABLE IF NOT EXISTS sequences (
+		id VARCHAR(36) PRIMARY KEY,
+		school_id VARCHAR(36),
+		name TEXT NOT NULL,
+		is_locked BOOLEAN DEFAULT false
+	);
+	CREATE TABLE IF NOT EXISTS marks (
+		id VARCHAR(36) PRIMARY KEY,
+		school_id VARCHAR(36),
+		student_id VARCHAR(36),
+		class_id VARCHAR(36),
+		subject_id VARCHAR(36),
+		sequence_id VARCHAR(36),
+		score REAL NOT NULL,
+		teacher_id VARCHAR(36),
+		date_entered TEXT,
+		UNIQUE(student_id, subject_id, sequence_id)
+	);
+	CREATE TABLE IF NOT EXISTS report_card_templates (
+		id VARCHAR(36) PRIMARY KEY,
+		school_id VARCHAR(36) UNIQUE,
+		logo_url TEXT,
+		motto TEXT,
+		principal TEXT,
+		passing_score REAL DEFAULT 10.0
+	);
+	CREATE TABLE IF NOT EXISTS streams (
+		id VARCHAR(36) PRIMARY KEY,
+		school_id VARCHAR(36),
+		class_name TEXT NOT NULL,
+		stream_name TEXT NOT NULL,
+		UNIQUE(school_id, class_name, stream_name)
+	);
+	CREATE TABLE IF NOT EXISTS subjects (
+		id VARCHAR(36) PRIMARY KEY,
+		school_id VARCHAR(36),
+		class_id VARCHAR(36),
+		name TEXT NOT NULL,
+		coefficient REAL NOT NULL
+	);
+
 SELECT COUNT(*) as total_schools FROM schools;
 SELECT COUNT(*) as total_users FROM users;
 SELECT COUNT(*) as total_links FROM parent_student_links;

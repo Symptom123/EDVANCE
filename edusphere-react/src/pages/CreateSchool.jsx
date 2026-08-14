@@ -64,7 +64,8 @@ const CreateSchool = () => {
         ...config,
         schoolId: data.schoolId,
         userRole: 'Admin',
-        userId: data.adminId
+        userId: data.adminId,
+        id: data.adminId
       }));
 
       navigate('/admin');

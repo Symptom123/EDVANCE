@@ -206,39 +206,44 @@ export default function ReportCardView({ reportCards, accent, config, isEditing,
               <table className="grades-table">
                 <thead>
                   <tr>
-                    <th style={{ textAlign: 'left', width: '28%' }}>Subject / Matière</th>
+                    <th style={{ textAlign: 'left', width: '25%' }}>Subject / Matière</th>
                     <th>Coef</th>
-                    <th>Mark /20<br/><span style={{ fontSize: 10, fontWeight: 400 }}>Note</span></th>
+                    <th>Seq 1<br/><span style={{ fontSize: 10, fontWeight: 400 }}>S1</span></th>
+                    <th>Seq 2<br/><span style={{ fontSize: 10, fontWeight: 400 }}>S2</span></th>
+                    <th>Avg /20<br/><span style={{ fontSize: 10, fontWeight: 400 }}>Moy</span></th>
                     <th>Weighted<br/><span style={{ fontSize: 10, fontWeight: 400 }}>Total</span></th>
                     <th>Grade<br/><span style={{ fontSize: 10, fontWeight: 400 }}>Cote</span></th>
-                    <th>Appreciation</th>
+                    <th>Rank<br/><span style={{ fontSize: 10, fontWeight: 400 }}>Rang</span></th>
                     <th>Teacher<br/><span style={{ fontSize: 10, fontWeight: 400 }}>Enseignant</span></th>
                   </tr>
                 </thead>
                 <tbody>
                   {rc.subjects && rc.subjects.length > 0 ? rc.subjects.map((sub, i) => {
                     const coef = sub.coefficient || 1;
-                    const mark = typeof sub.mark === 'number' ? sub.mark : parseFloat(sub.mark) || 0;
-                    const total = mark * coef;
-                    const { grade, app, color } = getGradeInfo(mark);
+                    const seq1 = sub.seq1Mark !== undefined ? Number(sub.seq1Mark).toFixed(2) : '-';
+                    const seq2 = sub.seq2Mark !== undefined ? Number(sub.seq2Mark).toFixed(2) : '-';
+                    const avgMark = sub.termAverage !== undefined ? Number(sub.termAverage) : 0;
+                    const total = sub.weightedScore !== undefined ? Number(sub.weightedScore) : (avgMark * coef);
+                    const grade = sub.grade || '-';
+                    const rank = sub.subjectRank || '-';
+                    const color = overallColor; // We could color code based on getGradeInfo(avgMark)
+                    
                     return (
                       <tr key={i}>
-                        <td className="subject-name">{sub.name || sub.subjectName || `Subject ${i+1}`}</td>
+                        <td className="subject-name">{sub.subjectName || `Subject ${i+1}`}</td>
                         <td style={{ fontWeight: 'bold' }}>{coef}</td>
-                        <td style={{ fontWeight: 'bold', fontSize: 13 }}>{mark.toFixed(2)}</td>
-                        <td>{total.toFixed(2)}</td>
+                        <td>{seq1}</td>
+                        <td>{seq2}</td>
+                        <td style={{ fontWeight: 'bold', fontSize: 13, background: '#f8fafc' }}>{avgMark.toFixed(2)}</td>
+                        <td style={{ fontWeight: 'bold' }}>{total.toFixed(2)}</td>
                         <td><strong style={{ color }}>{grade}</strong></td>
-                        <td>
-                          <span className="appreciation-badge" style={{ background: color + '22', color }}>
-                            {app}
-                          </span>
-                        </td>
+                        <td>{rank}</td>
                         <td style={{ fontSize: 11, color: '#555' }}>{sub.teacherName || '-'}</td>
                       </tr>
                     );
                   }) : (
                     <tr>
-                      <td colSpan={7} style={{ textAlign: 'center', color: '#888', fontStyle: 'italic', padding: 16 }}>
+                      <td colSpan={9} style={{ textAlign: 'center', color: '#888', fontStyle: 'italic', padding: 16 }}>
                         No subject grades available for this student.
                       </td>
                     </tr>
@@ -249,11 +254,11 @@ export default function ReportCardView({ reportCards, accent, config, isEditing,
               {/* ── SUMMARY BOX ── */}
               <div className="rc-summary">
                 <div className="rc-summary-stat">
-                  <span className="val">{rc.totalMarks != null ? Number(rc.totalMarks).toFixed(1) : '-'}</span>
+                  <span className="val">{rc.totalScore != null ? Number(rc.totalScore).toFixed(1) : '-'}</span>
                   <span className="lbl">Total Marks</span>
                 </div>
                 <div className="rc-summary-stat">
-                  <span className="val">{rc.totalCoef || '-'}</span>
+                  <span className="val">{rc.totalCoeff || '-'}</span>
                   <span className="lbl">Total Coef</span>
                 </div>
                 <div className="rc-summary-stat">
@@ -270,15 +275,27 @@ export default function ReportCardView({ reportCards, accent, config, isEditing,
                 </div>
               </div>
 
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 14 }}>
+                <div style={{ border: '1px solid #ccc', padding: 8, fontSize: 12, background: '#fafafa' }}>
+                  <p style={{ margin: '0 0 4px', fontWeight: 'bold' }}>Class Statistics</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Class Average:</span> <strong>{rc.classAverage ? rc.classAverage.toFixed(2) : '-'}</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Highest Average:</span> <strong>{rc.highestAverage ? rc.highestAverage.toFixed(2) : '-'}</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Lowest Average:</span> <strong>{rc.lowestAverage ? rc.lowestAverage.toFixed(2) : '-'}</strong></div>
+                </div>
+                <div style={{ border: '1px solid #ccc', padding: 8, fontSize: 12, background: '#fafafa' }}>
+                  <p style={{ margin: '0 0 4px', fontWeight: 'bold' }}>Promotion / Decision</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: rc.promotionStatus === 'Promoted' ? '#15803d' : '#dc2626' }}>
+                    <span style={{ fontWeight: 'bold', fontSize: 16 }}>{rc.promotionStatus || 'Pending Decision'}</span>
+                  </div>
+                  <p style={{ margin: '4px 0 0', fontStyle: 'italic', color: '#555' }}>{rc.principalRemark || overallApp}</p>
+                </div>
+              </div>
+
               {/* ── REMARKS ── */}
               <div style={{ marginBottom: 12, fontSize: 12 }}>
                 <strong>Remarks / Observations:</strong>
                 <div className="rc-remarks" style={{ marginTop: 4 }}>
-                  {avg >= 16 ? '🏅 Excellent performance! Keep it up.' :
-                   avg >= 14 ? '👍 Very good work this term.' :
-                   avg >= 12 ? '✅ Good results. Continue to improve.' :
-                   avg >= 10 ? '⚠️ Satisfactory, but needs more effort.' :
-                               '❌ Performance below average. Requires extra support.'}
+                  {rc.principalRemark || overallApp}
                 </div>
               </div>
 

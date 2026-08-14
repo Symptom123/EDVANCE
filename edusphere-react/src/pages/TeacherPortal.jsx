@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ClipboardCheck, GraduationCap, FileText, UserPlus, Megaphone, User, LogOut, Plus, Loader2, CheckCircle2, X, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, ClipboardCheck, GraduationCap, FileText, UserPlus, Megaphone, User, LogOut, Plus, Loader2, CheckCircle2, X, Mail, Trash2, Download, BookOpen, Users } from 'lucide-react';
 import { T, rgba, navItemStyle, cardStyle, inputStyle, btnStyle, badge } from '../styles/portalTheme';
 import * as XLSX from 'xlsx';
 
@@ -8,27 +8,63 @@ export default function TeacherPortal() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [config, setConfig] = useState(null);
-  const [attendance, setAttendance] = useState({ 'Alice Johnson': 'present', 'Bob Smith': 'present', 'Clara Obi': 'absent', 'David Lee': 'present', 'Emma Nwosu': 'late' });
-  const [announcementText, setAnnouncementText] = useState('');
-  const [selectedClass, setSelectedClass] = useState('Mathematics - JSS 1A');
-  const [announcements, setAnnouncements] = useState([{ class: 'Mathematics - JSS 1A', text: 'Test next Monday. Please revise Chapters 7 & 8.', date: 'Oct 10, 2026' }, { class: 'English - JSS 1B', text: 'Essays due Friday. Submit via the portal.', date: 'Oct 08, 2026' }]);
-  const [grades, setGrades] = useState([{ name: 'Alice Johnson', assignment: 'Math HW 4', mark: 88, grade: 'B+' }, { name: 'Bob Smith', assignment: 'Math HW 4', mark: 95, grade: 'A' }, { name: 'Clara Obi', assignment: 'Math HW 4', mark: 72, grade: 'B-' }, { name: 'David Lee', assignment: 'Math HW 4', mark: 90, grade: 'A-' }, { name: 'Emma Nwosu', assignment: 'Math HW 4', mark: 78, grade: 'B' }]);
-  const [requests, setRequests] = useState([{ id: 1, student: 'Frank Eze', class: 'Mathematics - JSS 2A', date: 'Oct 11' }, { id: 2, student: 'Grace Okafor', class: 'Mathematics - JSS 1A', date: 'Oct 12' }, { id: 3, student: 'Henry Bello', class: 'Mathematics - JSS 2A', date: 'Oct 12' }]);
 
-  const [students, setStudents] = useState([]);
-  const [classes, setClasses] = useState([]);
+  // Common data
+  const [myClasses, setMyClasses] = useState([]);
+  const [sequences, setSequences] = useState([]);
+  const [allSchoolStudents, setAllSchoolStudents] = useState([]);
+
+  // Classes Management Tab
+  const [selectedManageClass, setSelectedManageClass] = useState(null);
+  const [classRoster, setClassRoster] = useState([]);
+  const [rosterLoading, setRosterLoading] = useState(false);
+  const [addRosterStudentId, setAddRosterStudentId] = useState('');
+  const [showCreateClassModal, setShowCreateClassModal] = useState(false);
+  const [newClassName, setNewClassName] = useState('');
+  const [newClassSubject, setNewClassSubject] = useState('');
+  const [newClassYear, setNewClassYear] = useState('');
+  const [createClassLoading, setCreateClassLoading] = useState(false);
+  
+  // Dashboard
+  const [dashData, setDashData] = useState({ classes: 0, students: 0, avgScore: 0, chartData: [] });
+  const [dashLoading, setDashLoading] = useState(true);
+
+  // Attendance
+  const [attClassId, setAttClassId] = useState('');
+  const [attDate, setAttDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [attStudents, setAttStudents] = useState([]);
+  const [attendance, setAttendance] = useState({});
+  const [attLoading, setAttLoading] = useState(false);
+
+  // Grading
   const [gradingClassId, setGradingClassId] = useState('');
-  const [gradingTermId, setGradingTermId] = useState('T1');
+  const [gradingSequenceId, setGradingSequenceId] = useState('');
+  const [gradStudents, setGradStudents] = useState([]);
+  const [marks, setMarks] = useState({});
+  const [gradLoading, setGradLoading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState(null);
 
-  useEffect(() => {
-    if (!config) return;
-    fetch(`http://localhost:8080/api/classes?schoolId=${config.schoolId}`)
-      .then(r => r.json()).then(c => setClasses(c || []));
-    fetch(`http://localhost:8080/api/users?schoolId=${config.schoolId}&role=Student`)
-      .then(r => r.json()).then(s => setStudents(s || []));
-  }, [config]);
+  // Assignments
+  const [assignClassId, setAssignClassId] = useState('');
+  const [assignments, setAssignments] = useState([]);
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [newAssign, setNewAssign] = useState({ title: '', description: '', dueDate: '' });
 
+  // Announcements
+  const [announcements, setAnnouncements] = useState([]);
+  const [annClassId, setAnnClassId] = useState('');
+  const [annText, setAnnText] = useState('');
+  const [annLoading, setAnnLoading] = useState(false);
+
+  // Messages
+  const [messages, setMessages] = useState([]);
+  const [msgLoading, setMsgLoading] = useState(false);
+  const [showMsgModal, setShowMsgModal] = useState(false);
+  const [msgUsers, setMsgUsers] = useState([]);
+  const [newMsg, setNewMsg] = useState({ recipientId: '', subject: '', body: '' });
+
+  // Initialization
   useEffect(() => {
     const raw = localStorage.getItem('edvance_school_config');
     try {
@@ -38,108 +74,147 @@ export default function TeacherPortal() {
     } catch { navigate('/login'); }
   }, [navigate]);
 
-  if (!config) return null;
-  const accent = config.primaryColor || '#2563eb';
-  const name = config.name || 'Teacher';
+  useEffect(() => {
+    const tid = config.id || config.userId || '';
+    const sid = config.schoolId || '';
+    
+    // Fetch dashboard
+    fetch(`http://localhost:8080/api/dashboard/teacher/${tid}?schoolId=${sid}`)
+      .then(r => r.json())
+      .then(d => {
+        setDashData(d || { classes: 0, students: 0, avgScore: 0, chartData: [] });
+        setDashLoading(false);
+      }).catch(() => setDashLoading(false));
 
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'attendance', label: 'Take Attendance', icon: ClipboardCheck },
-    { id: 'grading', label: 'Grading', icon: GraduationCap },
-    { id: 'assignments', label: 'Assignments', icon: FileText },
-    { id: 'requests', label: 'Enrollment Requests', icon: UserPlus },
-    { id: 'announcements', label: 'Announcements', icon: Megaphone },
-    { id: 'profile', label: 'Profile', icon: User },
-  ];
+    // Fetch classes
+    fetch(`http://localhost:8080/api/classes?schoolId=${sid}`)
+      .then(r => r.json())
+      .then(c => {
+        const mine = (c || []).filter(cls => !cls.teacherId || cls.teacherId === tid || cls.teacherId === config.name || String(cls.teacherId) === String(tid));
+        setMyClasses(mine.length > 0 ? mine : (c || []));
+        if (mine.length > 0) {
+          setAttClassId(mine[0].id || mine[0].ID);
+          setGradingClassId(mine[0].id || mine[0].ID);
+          setAssignClassId(mine[0].id || mine[0].ID);
+          setAnnClassId(mine[0].id || mine[0].ID);
+        }
+      });
 
-  const renderDashboard = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-      <div>
-        <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 8px' }}>Teacher Dashboard</p>
-        <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 38, fontWeight: 400, margin: 0, color: T.text }}>Good morning, {name} 👋</h1>
-        <p style={{ color: T.muted, margin: '8px 0 0', fontSize: 15 }}>Here's your class overview for today.</p>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-        {[{ label: 'Total Students', value: '87', color: accent }, { label: 'Avg Grade', value: 'B+', color: '#059669' }, { label: 'Attendance Rate', value: '94%', color: '#d97706' }, { label: 'Pending Requests', value: requests.length, color: '#dc2626' }].map(s => (
-          <div key={s.label} style={{ ...cardStyle, borderTop: `3px solid ${s.color}` }}>
-            <p style={{ color: T.muted, fontSize: 13, fontWeight: 500, margin: '0 0 10px' }}>{s.label}</p>
-            <p style={{ fontFamily: T.fontSerif, fontSize: 42, margin: 0, color: T.text, lineHeight: 1 }}>{s.value}</p>
-          </div>
-        ))}
-      </div>
-      <div style={cardStyle}>
-        <p style={{ fontFamily: T.fontSans, fontWeight: 600, color: T.text, margin: '0 0 4px', fontSize: 15 }}>Class Performance Over Weeks</p>
-        <p style={{ color: T.muted, fontSize: 13, margin: '0 0 20px' }}>Average score across all active classes</p>
-        <svg viewBox="0 0 700 160" style={{ width: '100%', display: 'block' }}>
-          <defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={accent} stopOpacity="0.15" /><stop offset="100%" stopColor={accent} stopOpacity="0" /></linearGradient></defs>
-          {[0,40,80,120,160].map((y,i) => <line key={i} x1="0" y1={y} x2="700" y2={y} stroke={T.border} strokeWidth="1" />)}
-          <polyline fill="none" stroke={accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points="0,130 87.5,115 175,85 262.5,100 350,60 437.5,72 525,42 612.5,52 700,28" />
-          <polygon fill="url(#tg)" points="0,130 87.5,115 175,85 262.5,100 350,60 437.5,72 525,42 612.5,52 700,28 700,160 0,160" />
-          {[[0,130],[87.5,115],[175,85],[262.5,100],[350,60],[437.5,72],[525,42],[612.5,52],[700,28]].map(([x,y],i) => <circle key={i} cx={x} cy={y} r="5" fill={accent} stroke="white" strokeWidth="2" />)}
-        </svg>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>{['Wk1','Wk2','Wk3','Wk4','Wk5','Wk6','Wk7','Wk8','Wk9'].map(w => <span key={w} style={{ color: T.light, fontSize: 11, fontWeight: 500 }}>{w}</span>)}</div>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        <div style={cardStyle}>
-          <p style={{ fontFamily: T.fontSans, fontWeight: 600, color: T.text, margin: '0 0 14px', fontSize: 15 }}>Recent Submissions</p>
-          {[{ name: 'Alice Johnson', assignment: 'Math HW 4', time: '2h ago' }, { name: 'Bob Smith', assignment: 'Math HW 4', time: '3h ago' }, { name: 'Clara Obi', assignment: 'Essay Draft', time: 'Yesterday' }].map((s, i) => (
-            <div key={i} style={{ display: 'flex', gap: 12, padding: '10px 0', borderBottom: i < 2 ? `1px solid ${T.borderLight}` : 'none', alignItems: 'center' }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: rgba(accent, 0.1), display: 'flex', alignItems: 'center', justifyContent: 'center', color: accent, fontFamily: T.fontSerif, fontStyle: 'italic', flexShrink: 0 }}>{s.name.charAt(0)}</div>
-              <div style={{ flex: 1 }}><p style={{ margin: 0, fontWeight: 600, fontSize: 13, color: T.text }}>{s.name}</p><p style={{ margin: 0, fontSize: 12, color: T.muted }}>{s.assignment}</p></div>
-              <span style={{ fontSize: 11, color: T.light }}>{s.time}</span>
-            </div>
-          ))}
-        </div>
-        <div style={cardStyle}>
-          <p style={{ fontFamily: T.fontSans, fontWeight: 600, color: T.text, margin: '0 0 14px', fontSize: 15 }}>Top Performers</p>
-          {[{ name: 'Bob Smith', avg: '95%', rank: 1 }, { name: 'Alice Johnson', avg: '92%', rank: 2 }, { name: 'Emma Nwosu', avg: '89%', rank: 3 }].map((s, i) => (
-            <div key={i} style={{ display: 'flex', gap: 12, padding: '10px 0', borderBottom: i < 2 ? `1px solid ${T.borderLight}` : 'none', alignItems: 'center' }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: i === 0 ? '#fef3c7' : T.borderLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: i === 0 ? '#d97706' : T.muted, flexShrink: 0 }}>#{s.rank}</div>
-              <p style={{ margin: 0, flex: 1, fontWeight: 600, fontSize: 13, color: T.text }}>{s.name}</p>
-              <strong style={{ color: accent, fontSize: 14 }}>{s.avg}</strong>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+    // Fetch sequences
+    fetch(`http://localhost:8080/api/sequences?schoolId=${config.schoolId}`)
+      .then(r => r.json())
+      .then(s => setSequences(s || []));
 
-  const renderAttendanceView = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div><p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Daily Record</p><h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Take Attendance</h1></div>
-      <div style={{ ...cardStyle, maxWidth: 560 }}>
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Select Class</label>
-          <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
-            {['Mathematics - JSS 1A', 'Mathematics - JSS 2A', 'English - JSS 1B'].map(c => <option key={c}>{c}</option>)}
-          </select>
-        </div>
-        {Object.entries(attendance).map(([student, status]) => (
-          <div key={student} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: `1px solid ${T.borderLight}` }}>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: rgba(accent, 0.1), display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.fontSerif, fontStyle: 'italic', color: accent }}>{student.charAt(0)}</div>
-              <strong style={{ fontSize: 14, color: T.text }}>{student}</strong>
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {['present', 'absent', 'late'].map(s => (
-                <button key={s} onClick={() => setAttendance(a => ({ ...a, [student]: s }))}
-                  style={{ padding: '6px 14px', borderRadius: 100, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: T.fontSans, background: status === s ? (s === 'present' ? '#dcfce7' : s === 'absent' ? '#fee2e2' : '#fef9c3') : T.borderLight, color: status === s ? (s === 'present' ? '#15803d' : s === 'absent' ? '#dc2626' : '#d97706') : T.muted, transition: 'all 0.15s', textTransform: 'capitalize' }}>
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-        <button style={{ ...btnStyle(accent), marginTop: 20 }}><CheckCircle2 size={15} />Save Attendance</button>
-      </div>
-    </div>
-  );
+    // Fetch users for messages
+    fetch(`http://localhost:8080/api/users?schoolId=${config.schoolId}`)
+      .then(r => r.json())
+      .then(u => {
+        setMsgUsers((u || []).filter(user => user.id !== config.id));
+      });
+
+    // Fetch all students for class enrollment management
+    fetch(`http://localhost:8080/api/users?schoolId=${config.schoolId}&role=Student`)
+      .then(r => r.json())
+      .then(s => setAllSchoolStudents(s || []));
+
+  }, [config]);
+
+  // Handle Attendance tab
+  useEffect(() => {
+    if (!config || activeTab !== 'attendance' || !attClassId) return;
+    setAttLoading(true);
+    
+    Promise.all([
+      fetch(`http://localhost:8080/api/enrollments?schoolId=${config.schoolId}&classId=${attClassId}`).then(r => r.json()),
+      fetch(`http://localhost:8080/api/attendance?schoolId=${config.schoolId}&classId=${attClassId}&date=${attDate}`).then(r => r.json())
+    ]).then(([enr, att]) => {
+      setAttStudents(enr || []);
+      const attMap = {};
+      (att || []).forEach(record => {
+        if (record.records) {
+          Object.assign(attMap, record.records);
+        }
+      });
+      // Initialize default
+      const defaultMap = { ...attMap };
+      (enr || []).forEach(s => {
+        if (!defaultMap[s.studentId]) defaultMap[s.studentId] = 'present';
+      });
+      setAttendance(defaultMap);
+      setAttLoading(false);
+    });
+  }, [config, activeTab, attClassId, attDate]);
+
+  const handleSaveAttendance = () => {
+    fetch(`http://localhost:8080/api/attendance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        schoolId: config.schoolId,
+        classId: attClassId,
+        teacherId: config.id,
+        date: attDate,
+        records: attendance
+      })
+    }).then(r => {
+      if (r.ok) alert('Attendance saved successfully');
+      else alert('Failed to save attendance');
+    });
+  };
+
+  // Handle Grading tab
+  useEffect(() => {
+    if (!config || activeTab !== 'grading' || !gradingClassId || !gradingSequenceId) return;
+    setGradLoading(true);
+
+    Promise.all([
+      fetch(`http://localhost:8080/api/enrollments?schoolId=${config.schoolId}&classId=${gradingClassId}`).then(r => r.json()),
+      fetch(`http://localhost:8080/api/marks?schoolId=${config.schoolId}&classId=${gradingClassId}&sequenceId=${gradingSequenceId}`).then(r => r.json())
+    ]).then(([enr, marksData]) => {
+      setGradStudents(enr || []);
+      const m = {};
+      (marksData || []).forEach(mk => {
+        m[mk.studentId] = mk.score;
+      });
+      setMarks(m);
+      setGradLoading(false);
+    });
+  }, [config, activeTab, gradingClassId, gradingSequenceId]);
+
+  const handleSaveMarks = () => {
+    const selectedCls = myClasses.find(c => (c.id || c.ID) === gradingClassId);
+    if (!selectedCls) return;
+    
+    const promises = gradStudents.map(s => {
+      const score = marks[s.studentId];
+      if (score === undefined || score === '') return Promise.resolve();
+      
+      return fetch(`http://localhost:8080/api/marks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          schoolId: config.schoolId,
+          studentId: s.studentId,
+          classId: gradingClassId,
+          subjectId: selectedCls.subject || selectedCls.name,
+          sequenceId: gradingSequenceId,
+          score: Number(score),
+          teacherId: config.id
+        })
+      });
+    });
+
+    Promise.all(promises).then(() => {
+      alert('All marks saved successfully');
+    });
+  };
+
   const handleExcelTemplateDownload = () => {
-    if (!gradingClassId) { alert("Please select a class first."); return; }
-    const templateData = students.map(s => ({
-      studentId: s.id,
-      studentName: s.name,
-      score: ''
+    if (!gradingClassId || !gradingSequenceId) { alert("Please select a class and sequence first."); return; }
+    const templateData = gradStudents.map(s => ({
+      studentId: s.studentId,
+      studentName: s.studentName,
+      score: marks[s.studentId] !== undefined ? marks[s.studentId] : ''
     }));
     const ws = XLSX.utils.json_to_sheet(templateData);
     const wb = XLSX.utils.book_new();
@@ -149,64 +224,291 @@ export default function TeacherPortal() {
 
   const handleExcelUpload = (e) => {
     const file = e.target.files[0];
-    if (!file || !gradingClassId || !gradingTermId) {
-      alert("Please select class, term, and a file.");
-      return;
-    }
+    if (!file || !gradingClassId || !gradingSequenceId) return;
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
-        const bstr = evt.target.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
-        
-        const formattedGrades = data.map(r => ({
-          studentId: r.studentId,
-          score: Number(r.score) || 0
-        })).filter(g => g.studentId);
-
-        setUploadStatus('Uploading...');
-        // Assume the subject is just the class's subject for now.
-        // We fetch class details to get the subject ID (if we had it). For now, use the class ID as a proxy for the single subject it teaches.
-        const res = await fetch(`http://localhost:8080/api/grades/bulk`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ grades: formattedGrades, subjectId: gradingClassId, termId: gradingTermId, schoolId: config.schoolId })
+        const wb = XLSX.read(evt.target.result, { type: 'binary' });
+        const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+        const newMarks = { ...marks };
+        data.forEach(r => {
+          if (r.studentId && r.score !== undefined) {
+            newMarks[r.studentId] = Number(r.score);
+          }
         });
-        if (res.ok) {
-          setUploadStatus('Upload successful!');
-          setTimeout(() => setUploadStatus(null), 3000);
-        } else {
-          setUploadStatus('Upload failed.');
-        }
+        setMarks(newMarks);
+        alert("Marks imported from Excel. Don't forget to click 'Save All Marks'.");
       } catch (err) {
-        setUploadStatus('Error reading file.');
+        alert('Error reading file.');
       }
     };
     reader.readAsBinaryString(file);
   };
 
-  const renderGrading = () => (
+  // Handle Assignments tab
+  const fetchAssignments = () => {
+    if (!assignClassId) return;
+    setAssignLoading(true);
+    fetch(`http://localhost:8080/api/assignments?schoolId=${config.schoolId}&classId=${assignClassId}`)
+      .then(r => r.json())
+      .then(d => { setAssignments(d || []); setAssignLoading(false); })
+      .catch(() => setAssignLoading(false));
+  };
+  useEffect(() => {
+    if (activeTab === 'assignments' && assignClassId) fetchAssignments();
+  }, [activeTab, assignClassId]);
+
+  const handleCreateAssignment = (e) => {
+    e.preventDefault();
+    fetch(`http://localhost:8080/api/assignments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        schoolId: config.schoolId,
+        classId: assignClassId,
+        teacherId: config.id,
+        teacherName: config.name,
+        title: newAssign.title,
+        description: newAssign.description,
+        dueDate: newAssign.dueDate
+      })
+    }).then(r => {
+      if (r.ok) {
+        setShowAssignModal(false);
+        setNewAssign({ title: '', description: '', dueDate: '' });
+        fetchAssignments();
+      }
+    });
+  };
+
+  // Handle Announcements tab
+  const fetchAnnouncements = () => {
+    setAnnLoading(true);
+    fetch(`http://localhost:8080/api/announcements?schoolId=${config.schoolId}`)
+      .then(r => r.json())
+      .then(d => { setAnnouncements(d || []); setAnnLoading(false); })
+      .catch(() => setAnnLoading(false));
+  };
+  useEffect(() => {
+    if (activeTab === 'announcements') fetchAnnouncements();
+  }, [activeTab]);
+
+  const handleCreateAnnouncement = () => {
+    if (!annText.trim() || !annClassId) return;
+    fetch(`http://localhost:8080/api/announcements`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        schoolId: config.schoolId,
+        classId: annClassId,
+        teacherId: config.id,
+        teacherName: config.name,
+        message: annText
+      })
+    }).then(r => {
+      if (r.ok) {
+        setAnnText('');
+        fetchAnnouncements();
+      }
+    });
+  };
+
+  const handleDeleteAnnouncement = (id) => {
+    fetch(`http://localhost:8080/api/announcements/${id}`, { method: 'DELETE' })
+      .then(r => { if(r.ok) fetchAnnouncements(); });
+  };
+
+  // Handle Messages tab
+  const fetchMessages = () => {
+    setMsgLoading(true);
+    fetch(`http://localhost:8080/api/messages?userId=${config.id}&box=inbox`)
+      .then(r => r.json())
+      .then(d => { setMessages(d || []); setMsgLoading(false); })
+      .catch(() => setMsgLoading(false));
+  };
+  useEffect(() => {
+    if (activeTab === 'messages') fetchMessages();
+  }, [activeTab]);
+
+  const handleReadMessage = (msg) => {
+    if (!msg.isRead) {
+      fetch(`http://localhost:8080/api/messages/${msg.id || msg.ID}/read`, { method: 'PUT' })
+        .then(() => fetchMessages());
+    }
+  };
+
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    fetch(`http://localhost:8080/api/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        schoolId: config.schoolId,
+        senderId: config.id,
+        senderName: config.name,
+        senderRole: 'Teacher',
+        recipientId: newMsg.recipientId,
+        subject: newMsg.subject,
+        body: newMsg.body
+      })
+    }).then(r => {
+      if (r.ok) {
+        setShowMsgModal(false);
+        setNewMsg({ recipientId: '', subject: '', body: '' });
+      }
+    });
+  };
+
+  if (!config) return null;
+  const accent = config.primaryColor || '#2563eb';
+  const name = config.name || 'Teacher';
+
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'classes', label: 'My Classes', icon: BookOpen },
+    { id: 'attendance', label: 'Take Attendance', icon: ClipboardCheck },
+    { id: 'grading', label: 'Grading', icon: GraduationCap },
+    { id: 'assignments', label: 'Assignments', icon: FileText },
+    { id: 'announcements', label: 'Announcements', icon: Megaphone },
+    { id: 'messages', label: 'Messages', icon: Mail },
+    { id: 'profile', label: 'Profile', icon: User },
+  ];
+
+  const renderDashboard = () => {
+    let maxAvg = Math.max(...(dashData.chartData || []).map(d => d.avg || 0), 1);
+    
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+        <div>
+          <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 8px' }}>Teacher Dashboard</p>
+          <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 38, fontWeight: 400, margin: 0, color: T.text }}>Good morning, {name} 👋</h1>
+          <p style={{ color: T.muted, margin: '8px 0 0', fontSize: 15 }}>Here's your class overview for today.</p>
+        </div>
+        
+        {dashLoading ? <div style={{ display: 'flex', gap: 8, color: T.muted }}><Loader2 size={16} className="spin" /> Loading...</div> : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+              {[{ label: 'Total Students', value: dashData.students || 0, color: accent }, 
+                { label: 'Total Classes', value: dashData.classes || 0, color: '#059669' }, 
+                { label: 'Avg Class Score', value: `${(dashData.avgScore || 0).toFixed(1)}%`, color: '#d97706' }
+              ].map(s => (
+                <div key={s.label} style={{ ...cardStyle, borderTop: `3px solid ${s.color}` }}>
+                  <p style={{ color: T.muted, fontSize: 13, fontWeight: 500, margin: '0 0 10px' }}>{s.label}</p>
+                  <p style={{ fontFamily: T.fontSerif, fontSize: 42, margin: 0, color: T.text, lineHeight: 1 }}>{s.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div style={cardStyle}>
+              <p style={{ fontFamily: T.fontSans, fontWeight: 600, color: T.text, margin: '0 0 4px', fontSize: 15 }}>Class Performance Over Time</p>
+              <p style={{ color: T.muted, fontSize: 13, margin: '0 0 20px' }}>Average score per sequence</p>
+              
+              {(!dashData.chartData || dashData.chartData.length === 0) ? (
+                <div style={{ padding: '40px 0', textAlign: 'center', color: T.muted }}>No grade data yet</div>
+              ) : (
+                <svg viewBox="0 0 700 160" style={{ width: '100%', display: 'block' }}>
+                  <defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={accent} stopOpacity="0.15" /><stop offset="100%" stopColor={accent} stopOpacity="0" /></linearGradient></defs>
+                  {[0,40,80,120,160].map((y,i) => <line key={i} x1="0" y1={y} x2="700" y2={y} stroke={T.border} strokeWidth="1" />)}
+                  
+                  {(() => {
+                    const points = dashData.chartData.map((d, i) => {
+                      const x = (i / Math.max(1, dashData.chartData.length - 1)) * 700;
+                      const y = 160 - (((d.avg || 0) / maxAvg) * 130); 
+                      return [x, y];
+                    });
+                    const pointsStr = points.map(p => p.join(',')).join(' ');
+                    const polyPoints = `0,160 ${pointsStr} 700,160`;
+                    
+                    return (
+                      <>
+                        <polyline fill="none" stroke={accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsStr} />
+                        <polygon fill="url(#tg)" points={polyPoints} />
+                        {points.map(([x,y],i) => <circle key={i} cx={x} cy={y} r="5" fill={accent} stroke="white" strokeWidth="2" />)}
+                      </>
+                    );
+                  })()}
+                </svg>
+              )}
+              {dashData.chartData && dashData.chartData.length > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+                  {dashData.chartData.map((d, i) => <span key={i} style={{ color: T.light, fontSize: 11, fontWeight: 500 }}>{d.name}</span>)}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const renderAttendanceView = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div><p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Assessment</p><h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Grading</h1></div>
+      <div><p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Daily Record</p><h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Take Attendance</h1></div>
+      
+      <div style={{ ...cardStyle, maxWidth: 600 }}>
+        <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Select Class</label>
+            <select value={attClassId} onChange={e => setAttClassId(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
+              {myClasses.map(c => <option key={c.id || c.ID} value={c.id || c.ID}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Date</label>
+            <input type="date" value={attDate} onChange={e => setAttDate(e.target.value)} style={{ ...inputStyle, background: '#fff' }} />
+          </div>
+        </div>
+
+        {attLoading ? <div style={{ color: T.muted }}>Loading students...</div> : 
+         attStudents.length === 0 ? <div style={{ color: T.muted }}>No students enrolled in this class.</div> : (
+          <>
+            {attStudents.map((s) => (
+              <div key={s.studentId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: `1px solid ${T.borderLight}` }}>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: rgba(accent, 0.1), display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.fontSerif, fontStyle: 'italic', color: accent }}>{(s.studentName || '?').charAt(0)}</div>
+                  <strong style={{ fontSize: 14, color: T.text }}>{s.studentName}</strong>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {['present', 'absent', 'late'].map(st => (
+                    <button key={st} onClick={() => setAttendance(a => ({ ...a, [s.studentId]: st }))}
+                      style={{ padding: '6px 14px', borderRadius: 100, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: T.fontSans, background: attendance[s.studentId] === st ? (st === 'present' ? '#dcfce7' : st === 'absent' ? '#fee2e2' : '#fef9c3') : T.borderLight, color: attendance[s.studentId] === st ? (st === 'present' ? '#15803d' : st === 'absent' ? '#dc2626' : '#d97706') : T.muted, transition: 'all 0.15s', textTransform: 'capitalize' }}>
+                      {st}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <button onClick={handleSaveAttendance} style={{ ...btnStyle(accent), marginTop: 20 }}><CheckCircle2 size={15} />Save Attendance</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderGrading = () => {
+    const seq = sequences.find(s => (s.id || s.ID) === gradingSequenceId);
+    const isLocked = seq && seq.isLocked;
+    
+    return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div><p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Assessment</p><h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Mark Entry</h1></div>
       
       <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {isLocked && <div style={{ background: '#fee2e2', color: '#ef4444', padding: '12px 16px', borderRadius: 8, fontWeight: 600 }}>⚠️ This sequence is locked by the Admin. Marks cannot be edited.</div>}
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end' }}>
           <div>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Select Class</label>
             <select value={gradingClassId} onChange={e => setGradingClassId(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
               <option value="">-- Choose Class --</option>
-              {classes.map(c => <option key={c.ID || c.id} value={c.ID || c.id}>{c.name}</option>)}
+              {myClasses.map(c => <option key={c.ID || c.id} value={c.ID || c.id}>{c.name} {c.subject ? `(${c.subject})` : ''}</option>)}
             </select>
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Term</label>
-            <select value={gradingTermId} onChange={e => setGradingTermId(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
-              <option value="T1">First Term (T1)</option>
-              <option value="T2">Second Term (T2)</option>
-              <option value="T3">Third Term (T3)</option>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Sequence</label>
+            <select value={gradingSequenceId} onChange={e => setGradingSequenceId(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
+              <option value="">-- Choose Sequence --</option>
+              {sequences.map(s => <option key={s.id || s.ID} value={s.id || s.ID}>{s.name}</option>)}
+              {!sequences.length && <option value="" disabled>No sequences found</option>}
             </select>
           </div>
         </div>
@@ -216,81 +518,96 @@ export default function TeacherPortal() {
              Download Mark Sheet
           </button>
           
-          <label style={{ ...btnStyle('#10b981'), cursor: 'pointer', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <label style={{ ...btnStyle(isLocked ? '#ccc' : '#10b981'), cursor: isLocked ? 'not-allowed' : 'pointer', margin: 0, display: 'flex', alignItems: 'center', gap: 6, pointerEvents: isLocked ? 'none' : 'auto' }}>
              Upload Excel Marks
-            <input type="file" accept=".xlsx, .xls" style={{ display: 'none' }} onChange={handleExcelUpload} />
+            <input type="file" accept=".xlsx, .xls" style={{ display: 'none' }} onChange={handleExcelUpload} disabled={isLocked} />
           </label>
-          {uploadStatus && <span style={{ fontSize: 13, color: T.text }}>{uploadStatus}</span>}
         </div>
       </div>
 
-      <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: T.fontSans }}>
-          <thead><tr style={{ background: '#faf9f7' }}>{['Student', 'Assignment', 'Mark / 20', 'Grade', 'Action'].map(h => <th key={h} style={{ padding: '12px 20px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: T.light, letterSpacing: '0.5px', textTransform: 'uppercase', borderBottom: `1px solid ${T.border}` }}>{h}</th>)}</tr></thead>
-          <tbody>
-            {grades.map((g, i) => (
-              <tr key={i} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
-                <td style={{ padding: '14px 20px', fontWeight: 600, color: T.text }}>{g.name}</td>
-                <td style={{ padding: '14px 20px', color: T.muted, fontSize: 13 }}>{g.assignment}</td>
-                <td style={{ padding: '14px 20px' }}>
-                  <input type="number" min="0" max="20" value={g.mark} onChange={e => setGrades(gs => gs.map((r, j) => j === i ? { ...r, mark: Number(e.target.value) } : r))} style={{ ...inputStyle, width: 80, padding: '6px 10px', textAlign: 'center' }} />
-                </td>
-                <td style={{ padding: '14px 20px' }}><span style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 18, color: accent }}>{g.grade}</span></td>
-                <td style={{ padding: '14px 20px' }}><button style={{ ...btnStyle(accent), padding: '7px 14px', fontSize: 12 }}>Save</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {gradingClassId && gradingSequenceId && (
+        <div style={{ ...cardStyle }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: 16, color: T.text }}>Student Marks</h3>
+          {gradLoading ? <div style={{ color: T.muted }}>Loading...</div> : gradStudents.length === 0 ? <div style={{ color: T.muted }}>No students enrolled.</div> : (
+            <div>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, paddingBottom: 10, borderBottom: `1px solid ${T.borderLight}`, fontWeight: 600, color: T.muted, fontSize: 13 }}>
+                <span>Student Name</span>
+                <span>Score</span>
+              </div>
+              {gradStudents.map(s => (
+                <div key={s.studentId} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, padding: '12px 0', borderBottom: `1px solid ${T.borderLight}`, alignItems: 'center' }}>
+                  <strong style={{ fontSize: 14, color: T.text }}>{s.studentName}</strong>
+                  <input type="number" min="0" max="100" value={marks[s.studentId] !== undefined ? marks[s.studentId] : ''} onChange={e => setMarks(m => ({ ...m, [s.studentId]: e.target.value }))} disabled={isLocked} style={{ ...inputStyle, width: 100 }} placeholder="0-100" />
+                </div>
+              ))}
+              <div style={{ marginTop: 20 }}>
+                <button onClick={handleSaveMarks} disabled={isLocked} style={btnStyle(isLocked ? '#ccc' : accent)}><CheckCircle2 size={15} /> Save All Marks</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
-  );
+  )};
 
   const renderAssignments = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div><p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Tasks</p><h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Assignments</h1></div>
-        <button style={btnStyle(accent)}><Plus size={15} />Create Assignment</button>
+        <button onClick={() => setShowAssignModal(true)} style={btnStyle(accent)}><Plus size={15} />Create Assignment</button>
       </div>
-      <p style={{ color: T.muted, fontWeight: 600, margin: 0, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Active</p>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        {[{ title: 'Quadratic Equations HW', due: 'Oct 15, 2026', submissions: 18, total: 28 }, { title: 'Trigonometry Quiz', due: 'Oct 19, 2026', submissions: 22, total: 28 }].map((a, i) => (
-          <div key={i} style={{ ...cardStyle, borderLeft: `4px solid ${accent}` }}>
-            <h3 style={{ fontFamily: T.fontSans, fontWeight: 700, fontSize: 15, margin: '0 0 4px', color: T.text }}>{a.title}</h3>
-            <p style={{ color: T.muted, fontSize: 13, margin: '0 0 12px' }}>Due: {a.due}</p>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: T.muted }}>Submissions</span><strong style={{ color: accent }}>{a.submissions}/{a.total}</strong></div>
-            <div style={{ marginTop: 8, height: 5, background: T.borderLight, borderRadius: 100 }}><div style={{ height: '100%', width: `${(a.submissions / a.total) * 100}%`, background: accent, borderRadius: 100 }} /></div>
-          </div>
-        ))}
+      
+      <div style={{ marginBottom: 16, maxWidth: 400 }}>
+        <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Filter by Class</label>
+        <select value={assignClassId} onChange={e => setAssignClassId(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
+          {myClasses.map(c => <option key={c.id || c.ID} value={c.id || c.ID}>{c.name}</option>)}
+        </select>
       </div>
-      <p style={{ color: T.muted, fontWeight: 600, margin: '8px 0 0', fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Past</p>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        {[{ title: 'Algebra Basics HW', due: 'Oct 5, 2026', submissions: 27, total: 28 }, { title: 'Number Theory Test', due: 'Oct 2, 2026', submissions: 28, total: 28 }].map((a, i) => (
-          <div key={i} style={{ ...cardStyle, borderLeft: `4px solid ${T.border}`, opacity: 0.8 }}>
-            <h3 style={{ fontFamily: T.fontSans, fontWeight: 700, fontSize: 15, margin: '0 0 4px', color: T.text }}>{a.title}</h3>
-            <p style={{ color: T.muted, fontSize: 13, margin: '0 0 12px' }}>Due: {a.due}</p>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: T.muted }}>Submissions</span><strong style={{ color: '#059669' }}>{a.submissions}/{a.total}</strong></div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 
-  const renderRequests = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div><p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Enrollment</p><h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Enrollment Requests</h1></div>
-      {requests.length === 0 ? <div style={{ ...cardStyle, textAlign: 'center', padding: '48px', color: T.muted }}>No pending requests.</div> : requests.map(req => (
-        <div key={req.id} style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ width: 44, height: 44, borderRadius: '50%', background: rgba(accent, 0.1), display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 20, color: accent, flexShrink: 0 }}>{req.student.charAt(0)}</div>
-          <div style={{ flex: 1 }}>
-            <strong style={{ color: T.text }}>{req.student}</strong>
-            <p style={{ margin: '2px 0 0', fontSize: 13, color: T.muted }}>{req.class} · {req.date}</p>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setRequests(r => r.filter(x => x.id !== req.id))} style={btnStyle(accent)}>Approve</button>
-            <button onClick={() => setRequests(r => r.filter(x => x.id !== req.id))} style={{ ...btnStyle('#ef4444', true), border: '1.5px solid #fecaca', color: '#ef4444', background: '#fef2f2' }}>Reject</button>
+      {assignLoading ? <div style={{ color: T.muted }}>Loading...</div> : assignments.length === 0 ? <div style={{ color: T.muted }}>No assignments for this class.</div> : (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          {assignments.map((a, i) => (
+            <div key={a.id || i} style={{ ...cardStyle, borderLeft: `4px solid ${accent}`, position: 'relative' }}>
+              <h3 style={{ fontFamily: T.fontSans, fontWeight: 700, fontSize: 15, margin: '0 0 4px', color: T.text }}>{a.title}</h3>
+              <p style={{ color: T.muted, fontSize: 13, margin: '0 0 12px' }}>Due: {new Date(a.dueDate).toLocaleDateString()}</p>
+              <p style={{ color: T.text, fontSize: 14 }}>{a.description}</p>
+              
+              <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+                <button onClick={() => window.print()} style={{ ...btnStyle('#10b981'), background: 'transparent', color: '#10b981', border: '1px solid #10b981', padding: '4px 8px', fontSize: 12 }}><Download size={14}/> PDF</button>
+                <button onClick={() => {
+                  fetch(`http://localhost:8080/api/assignments/${a.id || a.ID}`, { method: 'DELETE' }).then(() => fetchAssignments());
+                }} style={{ ...btnStyle('#ef4444'), background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', padding: '4px 8px', fontSize: 12 }}><Trash2 size={14}/> Delete</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showAssignModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          <div style={{ ...cardStyle, width: 400, maxWidth: '90%' }}>
+            <h2 style={{ margin: '0 0 16px', fontSize: 18 }}>Create Assignment</h2>
+            <form onSubmit={handleCreateAssignment} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>Title</label>
+                <input required type="text" value={newAssign.title} onChange={e => setNewAssign(a => ({ ...a, title: e.target.value }))} style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>Description</label>
+                <textarea required value={newAssign.description} onChange={e => setNewAssign(a => ({ ...a, description: e.target.value }))} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>Due Date</label>
+                <input required type="date" value={newAssign.dueDate} onChange={e => setNewAssign(a => ({ ...a, dueDate: e.target.value }))} style={inputStyle} />
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                <button type="submit" style={{ ...btnStyle(accent), flex: 1 }}>Save</button>
+                <button type="button" onClick={() => setShowAssignModal(false)} style={{ ...btnStyle('#6b7280'), flex: 1 }}>Cancel</button>
+              </div>
+            </form>
           </div>
         </div>
-      ))}
+      )}
     </div>
   );
 
@@ -300,22 +617,301 @@ export default function TeacherPortal() {
       <div style={{ ...cardStyle, maxWidth: 560 }}>
         <p style={{ fontFamily: T.fontSans, fontWeight: 700, fontSize: 15, color: T.text, margin: '0 0 16px' }}>New Announcement</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div><label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Select Class</label><select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>{['Mathematics - JSS 1A', 'Mathematics - JSS 2A', 'English - JSS 1B'].map(c => <option key={c}>{c}</option>)}</select></div>
-          <div><label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Message</label><textarea value={announcementText} onChange={e => setAnnouncementText(e.target.value)} rows={4} placeholder="Write your announcement here…" style={{ ...inputStyle, resize: 'vertical' }} /></div>
-          <button onClick={() => { if (announcementText.trim()) { setAnnouncements(a => [{ class: selectedClass, text: announcementText, date: 'Just now' }, ...a]); setAnnouncementText(''); } }} style={btnStyle(accent)}><Megaphone size={15} />Send to Class</button>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Select Class</label>
+            <select value={annClassId} onChange={e => setAnnClassId(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
+              {myClasses.map(c => <option key={c.id || c.ID} value={c.id || c.ID}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Message</label>
+            <textarea value={annText} onChange={e => setAnnText(e.target.value)} rows={4} placeholder="Write your announcement here…" style={{ ...inputStyle, resize: 'vertical' }} />
+          </div>
+          <button onClick={handleCreateAnnouncement} style={btnStyle(accent)}><Megaphone size={15} />Send to Class</button>
         </div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {announcements.map((a, i) => (
-          <div key={i} style={{ ...cardStyle, borderLeft: `4px solid ${accent}` }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={badge(accent, rgba(accent, 0.1))}>{a.class}</span>
-              <span style={{ fontSize: 12, color: T.light }}>{a.date}</span>
-            </div>
-            <p style={{ margin: 0, fontSize: 14, color: T.text, lineHeight: 1.6 }}>{a.text}</p>
-          </div>
-        ))}
+      
+      {annLoading ? <div style={{ color: T.muted }}>Loading...</div> : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {announcements.length === 0 ? <p style={{ color: T.muted }}>No announcements found.</p> : announcements.map((a, i) => {
+            const cls = myClasses.find(c => (c.id || c.ID) === a.classId) || { name: 'Class ' + a.classId };
+            return (
+              <div key={a.id || i} style={{ ...cardStyle, borderLeft: `4px solid ${accent}`, position: 'relative' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={badge(accent, rgba(accent, 0.1))}>{cls.name}</span>
+                  <span style={{ fontSize: 12, color: T.light }}>{new Date(a.CreatedAt || Date.now()).toLocaleDateString()}</span>
+                </div>
+                <p style={{ margin: 0, fontSize: 14, color: T.text, lineHeight: 1.6 }}>{a.message}</p>
+                <button onClick={() => handleDeleteAnnouncement(a.id || a.ID)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }}>
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderMessages = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div><p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Inbox</p><h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Messages</h1></div>
+        <button onClick={() => setShowMsgModal(true)} style={btnStyle(accent)}><Plus size={15} />Compose Message</button>
       </div>
+
+      {msgLoading ? <div style={{ color: T.muted }}>Loading messages...</div> : messages.length === 0 ? <div style={{ color: T.muted }}>Inbox is empty.</div> : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {messages.map((m, i) => (
+            <div key={m.id || i} onClick={() => handleReadMessage(m)} style={{ ...cardStyle, cursor: 'pointer', borderLeft: `4px solid ${m.isRead ? T.borderLight : accent}`, background: m.isRead ? '#fff' : '#f8fafc' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <strong style={{ color: T.text, fontSize: 15 }}>{m.subject}</strong>
+                <span style={{ fontSize: 12, color: T.light }}>{new Date(m.CreatedAt || Date.now()).toLocaleString()}</span>
+              </div>
+              <p style={{ fontSize: 13, color: T.muted, margin: '0 0 8px' }}>From: {m.senderName} ({m.senderRole})</p>
+              <p style={{ fontSize: 14, color: T.text, margin: 0 }}>{m.body}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showMsgModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          <div style={{ ...cardStyle, width: 400, maxWidth: '90%' }}>
+            <h2 style={{ margin: '0 0 16px', fontSize: 18 }}>Compose Message</h2>
+            <form onSubmit={handleSendMessage} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>To</label>
+                <select required value={newMsg.recipientId} onChange={e => setNewMsg(m => ({ ...m, recipientId: e.target.value }))} style={{ ...inputStyle, background: '#fff' }}>
+                  <option value="">-- Select Recipient --</option>
+                  {msgUsers.map(u => <option key={u.id || u.ID} value={u.id || u.ID}>{u.name} ({u.role})</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>Subject</label>
+                <input required type="text" value={newMsg.subject} onChange={e => setNewMsg(m => ({ ...m, subject: e.target.value }))} style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>Body</label>
+                <textarea required value={newMsg.body} onChange={e => setNewMsg(m => ({ ...m, body: e.target.value }))} rows={4} style={{ ...inputStyle, resize: 'vertical' }} />
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                <button type="submit" style={{ ...btnStyle(accent), flex: 1 }}>Send</button>
+                <button type="button" onClick={() => setShowMsgModal(false)} style={{ ...btnStyle('#6b7280'), flex: 1 }}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const fetchClassesAgain = () => {
+    fetch(`http://localhost:8080/api/classes?schoolId=${config.schoolId}`)
+      .then(r => r.json())
+      .then(c => {
+        const mine = (c || []).filter(cls => cls.teacherId === config.id || cls.teacherId === config.name);
+        setMyClasses(mine);
+      });
+  };
+
+  const handleFetchClassRoster = (cls) => {
+    setSelectedManageClass(cls);
+    setRosterLoading(true);
+    const classId = cls.id || cls.ID;
+    fetch(`http://localhost:8080/api/enrollments?schoolId=${config.schoolId}&classId=${classId}`)
+      .then(r => r.json())
+      .then(d => { setClassRoster(d || []); setRosterLoading(false); })
+      .catch(() => setRosterLoading(false));
+  };
+
+  const handleAddStudentToClass = () => {
+    if (!addRosterStudentId || !selectedManageClass) return;
+    const classId = selectedManageClass.id || selectedManageClass.ID;
+    fetch(`http://localhost:8080/api/enrollments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        schoolId: config.schoolId,
+        classId: classId,
+        studentId: addRosterStudentId
+      })
+    }).then(r => {
+      if (r.ok) {
+        setAddRosterStudentId('');
+        handleFetchClassRoster(selectedManageClass);
+      }
+    });
+  };
+
+  const handleRemoveStudentFromClass = (studentId) => {
+    if (!selectedManageClass || !window.confirm('Remove student from this class?')) return;
+    const classId = selectedManageClass.id || selectedManageClass.ID;
+    fetch(`http://localhost:8080/api/enrollments?classId=${classId}&studentId=${studentId}`, {
+      method: 'DELETE'
+    }).then(r => {
+      if (r.ok) {
+        handleFetchClassRoster(selectedManageClass);
+      }
+    });
+  };
+
+  const handleCreateNewClass = (e) => {
+    e.preventDefault();
+    if (!newClassName || !newClassSubject) return;
+    setCreateClassLoading(true);
+    fetch(`http://localhost:8080/api/classes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        schoolId: config.schoolId,
+        name: newClassName,
+        subject: newClassSubject,
+        year: newClassYear,
+        teacherId: config.id
+      })
+    }).then(r => {
+      if (r.ok) {
+        setShowCreateClassModal(false);
+        setNewClassName(''); setNewClassSubject(''); setNewClassYear('');
+        fetchClassesAgain();
+      }
+    }).finally(() => setCreateClassLoading(false));
+  };
+
+  const renderClassesTab = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Class Management</p>
+          <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>My Classes ({myClasses.length})</h1>
+        </div>
+        <button onClick={() => setShowCreateClassModal(true)} style={btnStyle(accent)}>
+          <Plus size={15} /> Create Class
+        </button>
+      </div>
+
+      {myClasses.length === 0 ? (
+        <div style={{ ...cardStyle, textAlign: 'center', padding: '60px 24px' }}>
+          <BookOpen size={36} style={{ color: T.light, marginBottom: 12 }} />
+          <h3 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 6px', color: T.text }}>No Classes Assigned Yet</h3>
+          <p style={{ color: T.muted, fontSize: 14, margin: '0 0 16px' }}>Create a new class above or ask your school admin to assign you to a class.</p>
+          <button onClick={() => setShowCreateClassModal(true)} style={btnStyle(accent)}>
+            <Plus size={15} /> Create Your First Class
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+          {myClasses.map((cls, i) => {
+            const classId = cls.id || cls.ID;
+            return (
+              <div key={i} style={{ ...cardStyle, borderTop: `3px solid ${accent}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <h3 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 22, margin: '0 0 4px', color: T.text }}>{cls.name}</h3>
+                    <span style={badge(accent, rgba(accent, 0.1))}>{cls.subject}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: T.muted, marginTop: 12, marginBottom: 18 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Level / Year</span><strong style={{ color: T.text }}>{cls.year || 'All Levels'}</strong></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Assigned Teacher</span><strong style={{ color: T.text }}>{name}</strong></div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: `1px solid ${T.borderLight}`, paddingTop: 14 }}>
+                  <button onClick={() => handleFetchClassRoster(cls)} style={{ ...btnStyle(accent), justifyContent: 'center', fontSize: 13, padding: '9px 12px' }}>
+                    <Users size={14} /> Manage Student Roster
+                  </button>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={() => { setGradingClassId(classId); setActiveTab('grading'); }}
+                      style={{ ...btnStyle(accent, true), flex: 1, justifyContent: 'center', fontSize: 12, padding: '7px 8px' }}
+                    >
+                      <GraduationCap size={13} /> Enter Marks
+                    </button>
+                    <button
+                      onClick={() => { setAttClassId(classId); setActiveTab('attendance'); }}
+                      style={{ ...btnStyle(accent, true), flex: 1, justifyContent: 'center', fontSize: 12, padding: '7px 8px' }}
+                    >
+                      <ClipboardCheck size={13} /> Attendance
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* CREATE CLASS MODAL */}
+      {showCreateClassModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          <div style={{ ...cardStyle, width: '100%', maxWidth: 480, padding: 28, position: 'relative' }}>
+            <button onClick={() => setShowCreateClassModal(false)} style={{ position: 'absolute', top: 20, right: 20, background: 'none', border: 'none', cursor: 'pointer', color: T.muted }}><X size={20} /></button>
+            <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 18px', fontSize: 24, color: T.text }}>Create New Class</h2>
+            <form onSubmit={handleCreateNewClass} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Class Name</label>
+                <input required type="text" value={newClassName} onChange={e => setNewClassName(e.target.value)} placeholder="e.g. Mathematics Grade 10" style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Subject</label>
+                <input required type="text" value={newClassSubject} onChange={e => setNewClassSubject(e.target.value)} placeholder="e.g. Mathematics" style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Year / Level</label>
+                <input type="text" value={newClassYear} onChange={e => setNewClassYear(e.target.value)} placeholder="e.g. Grade 10" style={inputStyle} />
+              </div>
+              <button disabled={createClassLoading} type="submit" style={{ ...btnStyle(accent), marginTop: 10, justifyContent: 'center' }}>
+                {createClassLoading ? 'Creating...' : 'Create Class'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MANAGE ROSTER MODAL */}
+      {selectedManageClass && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          <div style={{ ...cardStyle, width: '100%', maxWidth: 540, padding: 28, position: 'relative', maxHeight: '85vh', overflowY: 'auto' }}>
+            <button onClick={() => setSelectedManageClass(null)} style={{ position: 'absolute', top: 20, right: 20, background: 'none', border: 'none', cursor: 'pointer', color: T.muted }}><X size={20} /></button>
+            <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 4px', fontSize: 24, color: T.text }}>Class Roster: {selectedManageClass.name}</h2>
+            <p style={{ color: accent, fontSize: 13, fontWeight: 600, margin: '0 0 20px' }}>{selectedManageClass.subject} ({selectedManageClass.year || 'All Levels'})</p>
+
+            {/* Add student section */}
+            <div style={{ marginBottom: 20, background: '#faf9f7', padding: 14, borderRadius: 8, border: `1px solid ${T.border}` }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: T.text, marginBottom: 6 }}>Enroll Student into this Class</label>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <select value={addRosterStudentId} onChange={e => setAddRosterStudentId(e.target.value)} style={{ ...inputStyle, flex: 1, background: '#fff' }}>
+                  <option value="">-- Choose Student --</option>
+                  {allSchoolStudents.filter(s => !classRoster.some(cr => cr.studentId === s.id)).map(s => (
+                    <option key={s.id} value={s.id}>{s.name} ({s.email})</option>
+                  ))}
+                </select>
+                <button onClick={handleAddStudentToClass} style={btnStyle(accent)}>
+                  <Plus size={14} /> Enroll Student
+                </button>
+              </div>
+            </div>
+
+            {/* Roster list */}
+            <h4 style={{ fontFamily: T.fontSans, fontWeight: 700, fontSize: 14, color: T.text, margin: '0 0 10px' }}>Enrolled Students ({classRoster.length})</h4>
+            {rosterLoading ? <p style={{ fontSize: 13, color: T.muted }}>Loading roster...</p> : classRoster.length === 0 ? (
+              <p style={{ fontSize: 13, color: T.muted, fontStyle: 'italic' }}>No students enrolled in this class yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {classRoster.map(e => (
+                  <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: 8, background: '#fff', border: `1px solid ${T.borderLight}` }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{e.studentName}</span>
+                    <button onClick={() => handleRemoveStudentFromClass(e.studentId)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Trash2 size={13} /> Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -337,11 +933,12 @@ export default function TeacherPortal() {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard': return renderDashboard();
+      case 'classes': return renderClassesTab();
       case 'attendance': return renderAttendanceView();
       case 'grading': return renderGrading();
       case 'assignments': return renderAssignments();
-      case 'requests': return renderRequests();
       case 'announcements': return renderAnnouncements();
+      case 'messages': return renderMessages();
       case 'profile': return renderProfile();
       default: return renderDashboard();
     }
@@ -372,7 +969,7 @@ export default function TeacherPortal() {
         </div>
         <div>
           <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '1px' }}>Quick Stats</p>
-          {[{ label: 'Students', value: 87 }, { label: 'Classes', value: 3 }, { label: 'Pending', value: requests.length }].map(s => (
+          {[{ label: 'Students', value: dashData.students || 0 }, { label: 'Classes', value: dashData.classes || 0 }].map(s => (
             <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: `1px solid ${T.borderLight}` }}>
               <span style={{ color: T.muted, fontSize: 13 }}>{s.label}</span>
               <strong style={{ color: T.text }}>{s.value}</strong>
