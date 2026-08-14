@@ -110,7 +110,7 @@ var (
 	pgMu     sync.RWMutex
 )
 
-const dsn = "host=localhost port=5432 user=postgres password=Black@123 dbname=postgres sslmode=disable"
+const dsn = "host=localhost port=5432 user=postgres password=Black@123 dbname=edusphere sslmode=disable"
 
 func connectDB() {
 	db, err := sql.Open("postgres", dsn)
@@ -136,6 +136,17 @@ func connectDB() {
 
 	log.Println("[DB] ✅ Connected to PostgreSQL!")
 	migrateSchema()
+
+	// Initialize sync engine and trigger initial sync
+	if syncEngine == nil {
+		initSyncEngine(db)
+		go func() {
+			time.Sleep(2 * time.Second) // Wait for tables to be ready
+			if err := syncEngine.SyncFromJSONToPostgres(); err != nil {
+				log.Printf("[Sync] Initial sync error: %v", err)
+			}
+		}()
+	}
 }
 
 func setOffline() {
@@ -442,6 +453,7 @@ func main() {
 	loadSyncQueue()
 	connectDB()
 	go syncWorker()
+	go syncOnConnectionRestoration()  // Start automatic sync on connection restore
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -452,10 +464,20 @@ func main() {
 	}))
 
 	r.Get("/api/status", func(w http.ResponseWriter, r *http.Request) {
-		syncQueueMu.Lock()
-		q := len(syncQueue)
-		syncQueueMu.Unlock()
-		jsonResp(w, map[string]interface{}{"online": isOnline(), "pendingSync": q})
+		jsonResp(w, getSyncStatus())
+	})
+
+	// Manual sync endpoint
+	r.Post("/api/sync/manual", func(w http.ResponseWriter, r *http.Request) {
+		if !isOnline() {
+			http.Error(w, "Database not connected", http.StatusServiceUnavailable)
+			return
+		}
+		if err := syncEngine.SyncFromJSONToPostgres(); err != nil {
+			http.Error(w, fmt.Sprintf("Sync failed: %v", err), http.StatusInternalServerError)
+			return
+		}
+		jsonResp(w, map[string]interface{}{"message": "Manual sync completed successfully", "status": getSyncStatus()})
 	})
 
 	r.Post("/api/schools", createSchool)
