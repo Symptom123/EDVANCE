@@ -130,37 +130,33 @@ export default function Login() {
   const accentColor = schoolConfigCache?.primaryColor || '#064e3b';
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', fontFamily: T.fontSans, background: T.bg }}>
-
+    <div className="login-page-root">
       {/* LEFT PANEL — Branding */}
-      <div style={{
-        width: '45%', background: T.white,
-        borderRight: `1px solid ${T.border}`,
-        display: 'flex', flexDirection: 'column',
-        justifyContent: 'space-between', padding: '60px 64px',
-      }}>
+      <div className="login-branding-panel">
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <img src="/logo.png" alt="Edvance Logo" style={{ height: 72, objectFit: 'contain' }} />
+          <a href="/">
+            <img src="/logo.png" alt="Edvance Logo" style={{ height: 60, width: 'auto', objectFit: 'contain' }} />
+          </a>
         </div>
 
         {/* Hero Text */}
-        <div>
+        <div className="login-branding-text">
           <h1 style={{
             fontFamily: T.fontSerif,
-            fontSize: 54, lineHeight: 1.15, color: T.text, margin: '0 0 24px',
+            fontSize: 'clamp(32px, 4vw, 54px)', lineHeight: 1.15, color: T.text, margin: '0 0 16px',
           }}>
             Excellence in <br />
             <span style={{ fontStyle: 'italic', color: accentColor }}>Education Management.</span>
           </h1>
-          <p style={{ color: T.muted, fontSize: 16, lineHeight: 1.7, maxWidth: 400, margin: 0 }}>
+          <p style={{ color: T.muted, fontSize: 15, lineHeight: 1.6, maxWidth: 400, margin: 0 }}>
             A comprehensive, secure, and intuitive platform designed to elevate the administrative and academic experience for your institution.
           </p>
         </div>
 
         {/* Footer */}
-        <div>
-          <div style={{ width: 40, height: 2, background: accentColor, marginBottom: 16 }} />
+        <div className="login-branding-footer">
+          <div style={{ width: 40, height: 2, background: accentColor, marginBottom: 12 }} />
           <p style={{ color: T.muted, fontSize: 13, margin: 0 }}>
             Edvance Global Educational Solutions
           </p>
@@ -168,19 +164,16 @@ export default function Login() {
       </div>
 
       {/* RIGHT PANEL — Form */}
-      <div style={{
-        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '40px 48px',
-      }}>
-        <div style={{ width: '100%', maxWidth: 420 }}>
+      <div className="login-form-panel">
+        <div className="login-form-card">
 
           {!isFirstLogin ? (
             <>
-              <div style={{ marginBottom: 40 }}>
-                <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, color: T.text, margin: '0 0 10px', fontWeight: 400 }}>
+              <div style={{ marginBottom: 32 }}>
+                <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 'clamp(26px, 3.5vw, 34px)', color: T.text, margin: '0 0 8px', fontWeight: 400 }}>
                   Welcome back
                 </h2>
-                <p style={{ color: T.muted, fontSize: 15, margin: 0 }}>
+                <p style={{ color: T.muted, fontSize: 14, margin: 0 }}>
                   Sign in with your school-issued credentials.
                 </p>
               </div>

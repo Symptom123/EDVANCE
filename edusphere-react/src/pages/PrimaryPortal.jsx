@@ -15,7 +15,13 @@ const PrimaryPortal = () => {
     }
   }, [navigate]);
 
-  if (!config) return null;
+  if (!config) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, background: '#f5f4f0' }}>
+      <div style={{ width: 40, height: 40, border: '4px solid #e5e7eb', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }}/>
+      <p style={{ color: '#9ca3af', fontSize: 14, fontFamily: 'system-ui' }}>Loading your portal...</p>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
 
   return (
     <div style={{ "--btn-color": config.primaryColor, display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: "'Open Sans', sans-serif" }}>

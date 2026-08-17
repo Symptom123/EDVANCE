@@ -4,68 +4,72 @@ const Footer = () => {
   return (
     <footer className="site-footer">
       <div className="container">
-        <div className="footer-grid">
-          <div className="footer-brand">
-            <a className="brand" href="#" aria-label="Edvance Home" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <img
-                src="/images/logo-monogram.png"
-                alt="Edvance"
-                style={{ height: '40px', width: 'auto', objectFit: 'contain' }}
-              />
-            </a>
+        <div className="footer-main">
+          {/* Brand Col */}
+          <div className="footer-brand-col">
+            <span className="footer-wordmark">
+              Edv<span>ance</span>
+            </span>
             <p className="footer-tagline">
-              The enterprise school management platform trusted by 2,400+ institutions worldwide.
+              The enterprise school management standard trusted by 2,400+ leading institutions across sub-Saharan Africa.
             </p>
-            <div className="footer-compliance">
-              <span>SOC 2 Certified</span>
-              <span>FERPA</span>
-              <span>GDPR</span>
+            <div className="footer-badges">
+              <span className="footer-badge">MINESEC Compliant</span>
+              <span className="footer-badge">GCE Board Ready</span>
+              <span className="footer-badge">SOC-2 & GDPR</span>
             </div>
           </div>
-          <div className="footer-links">
-            <div className="footer-col">
-              <h4>Product</h4>
-              <a href="#features">Features</a>
-              <a href="#showcase">Portals</a>
-              <a href="#pricing">Pricing</a>
-              <a href="#">Changelog</a>
-              <a href="#">Roadmap</a>
-              <a href="/login" style={{ color: '#10B981', fontWeight: 600 }}>Sign in →</a>
-              <a href="/register" style={{ color: '#10B981', fontWeight: 600 }}>Create school →</a>
+
+          {/* Links Cols */}
+          <div className="footer-links-cols">
+            <div>
+              <span className="footer-col-title">Platform</span>
+              <a href="#solution" className="footer-link">Mark Calculations</a>
+              <a href="#dashboard" className="footer-link">Report Card Engine</a>
+              <a href="#dashboard" className="footer-link">Parent Portal</a>
+              <a href="#pricing" className="footer-link">Pricing & Plans</a>
+              <a href="/login" className="footer-link highlight">Staff Login →</a>
+              <a href="/register" className="footer-link highlight">Create School →</a>
             </div>
-            <div className="footer-col">
-              <h4>Solutions</h4>
-              <a href="#">K-12 Schools</a>
-              <a href="#">Universities</a>
-              <a href="#">School Districts</a>
-              <a href="#">Private Schools</a>
-              <a href="#">International</a>
+
+            <div>
+              <span className="footer-col-title">Curriculums</span>
+              <a href="#solution" className="footer-link">Cameroon GCE O/A</a>
+              <a href="#solution" className="footer-link">BEPC & Baccalauréat</a>
+              <a href="#solution" className="footer-link">WAEC & WASSCE</a>
+              <a href="#solution" className="footer-link">Cambridge IGCSE</a>
+              <a href="#solution" className="footer-link">Bilingual Systems</a>
             </div>
-            <div className="footer-col">
-              <h4>Resources</h4>
-              <a href="#">Documentation</a>
-              <a href="#">Help Centre</a>
-              <a href="#">Blog</a>
-              <a href="#">Webinars</a>
-              <a href="#">API Reference</a>
+
+            <div>
+              <span className="footer-col-title">Resources</span>
+              <a href="#faq" className="footer-link">Documentation</a>
+              <a href="#faq" className="footer-link">Coefficient Guide</a>
+              <a href="#testimonials" className="footer-link">Case Studies</a>
+              <a href="#faq" className="footer-link">Support Desk</a>
+              <a href="#contact" className="footer-link">WhatsApp Registrar</a>
             </div>
-            <div className="footer-col">
-              <h4>Company</h4>
-              <a href="#">About</a>
-              <a href="#">Careers</a>
-              <a href="#">Press</a>
-              <a href="#contact">Contact</a>
-              <a href="#">Partners</a>
+
+            <div>
+              <span className="footer-col-title">Institutional</span>
+              <a href="#hero" className="footer-link">About Edvance</a>
+              <a href="#contact" className="footer-link">Regional Offices</a>
+              <a href="#contact" className="footer-link">Ministry Inquiries</a>
+              <a href="#contact" className="footer-link">Trust & Security</a>
+              <a href="#pricing" className="footer-link">District Partnerships</a>
             </div>
           </div>
         </div>
+
+        {/* Footer Bottom */}
         <div className="footer-bottom">
-          <p>© {new Date().getFullYear()} Edvance Global Educational Solutions. All rights reserved.</p>
+          <p className="footer-copy">
+            © {new Date().getFullYear()} Edvance Educational Systems Ltd. Built with pride for Africa's educators.
+          </p>
           <div className="footer-legal">
-            <a href="#">Privacy Policy</a>
-            <a href="#">Terms of Service</a>
-            <a href="#">Cookie Policy</a>
-            <a href="#">Security</a>
+            <a href="#">Data Privacy Charter</a>
+            <a href="#">Terms of Academic Service</a>
+            <a href="#">Security Safeguards</a>
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 
-const AnimatedCounter = ({ target, suffix = '', isDecimal = false }) => {
+const AnimatedCounter = ({ target, suffix = '', prefix = '', isDecimal = false }) => {
   const nodeRef = useRef(null);
 
   useEffect(() => {
@@ -20,14 +20,14 @@ const AnimatedCounter = ({ target, suffix = '', isDecimal = false }) => {
 
         if (target >= 10000) {
           if (suffix === 'K') {
-            el.textContent = Math.floor(val / 1000) + 'K';
+            el.textContent = prefix + Math.floor(val / 1000) + 'K';
           } else {
-            el.textContent = Math.floor(val).toLocaleString();
+            el.textContent = prefix + Math.floor(val).toLocaleString() + suffix;
           }
         } else if (target >= 100) {
-          el.textContent = Math.floor(val).toLocaleString() + suffix;
+          el.textContent = prefix + Math.floor(val).toLocaleString() + suffix;
         } else {
-          el.textContent = val.toFixed(decimals) + suffix;
+          el.textContent = prefix + val.toFixed(decimals) + suffix;
         }
 
         if (progress < 1) requestAnimationFrame(update);
@@ -42,39 +42,55 @@ const AnimatedCounter = ({ target, suffix = '', isDecimal = false }) => {
           observer.unobserve(entry.target);
         }
       });
-    }, { threshold: 0.5 });
+    }, { threshold: 0.4 });
 
     observer.observe(el);
 
     return () => observer.disconnect();
-  }, [target, suffix, isDecimal]);
+  }, [target, suffix, prefix, isDecimal]);
 
-  return <div className="metric-value" ref={nodeRef}>0</div>;
+  return <span ref={nodeRef}>{prefix}0{suffix}</span>;
 };
 
 const Metrics = () => {
   return (
-    <section className="metrics-section" id="solutions">
+    <section className="metrics-section" id="metrics">
       <div className="container">
-        <div className="metrics-grid">
+        <div className="metrics-grid reveal">
           <div className="metric-item">
-            <AnimatedCounter target={2400} />
-            <div className="metric-label">Schools worldwide</div>
+            <div className="metric-value">
+              <AnimatedCounter target={2400} suffix="+" />
+            </div>
+            <div className="metric-label">
+              Educational institutions across Africa
+            </div>
           </div>
-          <div className="metric-divider"></div>
+
           <div className="metric-item">
-            <AnimatedCounter target={850000} suffix="K" />
-            <div className="metric-label">Active students</div>
+            <div className="metric-value">
+              <AnimatedCounter target={850} suffix="K+" />
+            </div>
+            <div className="metric-label">
+              Active students with verified digital records
+            </div>
           </div>
-          <div className="metric-divider"></div>
+
           <div className="metric-item">
-            <AnimatedCounter target={99.9} suffix="%" isDecimal={true} />
-            <div className="metric-label">Platform uptime SLA</div>
+            <div className="metric-value">
+              <AnimatedCounter target={40} suffix="%" />
+            </div>
+            <div className="metric-label">
+              Reduction in term-end administrative processing time
+            </div>
           </div>
-          <div className="metric-divider"></div>
+
           <div className="metric-item">
-            <AnimatedCounter target={4.9} isDecimal={true} />
-            <div className="metric-label">Average customer rating</div>
+            <div className="metric-value">
+              <AnimatedCounter target={99.9} suffix="%" isDecimal={true} />
+            </div>
+            <div className="metric-label">
+              Guaranteed platform availability SLA
+            </div>
           </div>
         </div>
       </div>

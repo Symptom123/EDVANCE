@@ -77,14 +77,14 @@ const CreateSchool = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '40px 20px', fontFamily: "'Open Sans', sans-serif" }}>
-      <div style={{ maxWidth: '800px', margin: '0 auto', backgroundColor: 'white', borderRadius: '24px', padding: '40px', boxShadow: '0 12px 0px rgba(0,0,0,0.05)' }}>
+    <div className="create-school-page" style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: 'clamp(20px, 5vw, 40px) 16px', fontFamily: "'Open Sans', sans-serif" }}>
+      <div className="create-school-card" style={{ maxWidth: '800px', margin: '0 auto', backgroundColor: 'white', borderRadius: '24px', padding: 'clamp(24px, 5vw, 40px)', boxShadow: '0 12px 24px rgba(0,0,0,0.05)' }}>
         
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '40px', gap: '16px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '32px', gap: '16px' }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', flexShrink: 0 }}>
             <Building size={24} />
           </div>
-          <h1 style={{ fontFamily: "'Fredoka', sans-serif", margin: 0, fontSize: '32px', color: '#0f172a' }}>
+          <h1 style={{ fontFamily: "'Fredoka', sans-serif", margin: 0, fontSize: 'clamp(24px, 4vw, 32px)', color: '#0f172a' }}>
             Create Your School
           </h1>
         </div>
@@ -92,7 +92,7 @@ const CreateSchool = () => {
         {/* STEP 1: Basics & Levels */}
         {step === 1 && (
           <div className="wizard-step">
-            <h2 style={{ fontFamily: "'Fredoka', sans-serif", fontSize: '24px', marginBottom: '24px' }}>1. School Structure</h2>
+            <h2 style={{ fontFamily: "'Fredoka', sans-serif", fontSize: '22px', marginBottom: '20px' }}>1. School Structure</h2>
             
             <div style={{ marginBottom: '24px' }}>
               <label style={{ display: 'block', fontWeight: 600, marginBottom: '8px' }}>School Name</label>
@@ -101,7 +101,7 @@ const CreateSchool = () => {
                 value={config.schoolName}
                 onChange={(e) => setConfig({...config, schoolName: e.target.value})}
                 placeholder="e.g. Severna Private School"
-                style={{ width: '100%', padding: '16px', borderRadius: '12px', border: '2px solid #e2e8f0', fontSize: '16px', marginBottom: '16px' }}
+                style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '2px solid #e2e8f0', fontSize: '16px', marginBottom: '16px', boxSizing: 'border-box' }}
               />
 
               <label style={{ display: 'block', fontWeight: 600, marginBottom: '8px' }}>Admin Name</label>
@@ -110,7 +110,7 @@ const CreateSchool = () => {
                 value={config.adminName}
                 onChange={(e) => setConfig({...config, adminName: e.target.value})}
                 placeholder="John Doe"
-                style={{ width: '100%', padding: '16px', borderRadius: '12px', border: '2px solid #e2e8f0', fontSize: '16px', marginBottom: '16px' }}
+                style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '2px solid #e2e8f0', fontSize: '16px', marginBottom: '16px', boxSizing: 'border-box' }}
               />
 
               <label style={{ display: 'block', fontWeight: 600, marginBottom: '8px' }}>Admin Email</label>
@@ -119,7 +119,7 @@ const CreateSchool = () => {
                 value={config.adminEmail}
                 onChange={(e) => setConfig({...config, adminEmail: e.target.value})}
                 placeholder="admin@school.com"
-                style={{ width: '100%', padding: '16px', borderRadius: '12px', border: '2px solid #e2e8f0', fontSize: '16px', marginBottom: '16px' }}
+                style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '2px solid #e2e8f0', fontSize: '16px', marginBottom: '16px', boxSizing: 'border-box' }}
               />
 
               <label style={{ display: 'block', fontWeight: 600, marginBottom: '8px' }}>Admin Password</label>
@@ -128,32 +128,32 @@ const CreateSchool = () => {
                 value={config.adminPass}
                 onChange={(e) => setConfig({...config, adminPass: e.target.value})}
                 placeholder="Secure password"
-                style={{ width: '100%', padding: '16px', borderRadius: '12px', border: '2px solid #e2e8f0', fontSize: '16px' }}
+                style={{ width: '100%', padding: '14px 16px', borderRadius: '12px', border: '2px solid #e2e8f0', fontSize: '16px', boxSizing: 'border-box' }}
               />
             </div>
 
             <label style={{ display: 'block', fontWeight: 600, marginBottom: '12px' }}>Which levels does your school support?</label>
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '40px' }}>
+            <div className="create-school-levels" style={{ display: 'flex', gap: '16px', marginBottom: '32px', flexWrap: 'wrap' }}>
               <div 
                 onClick={() => toggleLevel('primary')}
-                style={{ flex: 1, padding: '24px', border: `2px solid ${config.levels.primary ? '#10B981' : '#e2e8f0'}`, borderRadius: '16px', cursor: 'pointer', backgroundColor: config.levels.primary ? '#ecfdf5' : 'white' }}
+                style={{ flex: '1 1 220px', padding: '20px', border: `2px solid ${config.levels.primary ? '#10B981' : '#e2e8f0'}`, borderRadius: '16px', cursor: 'pointer', backgroundColor: config.levels.primary ? '#ecfdf5' : 'white' }}
               >
-                <BookOpen size={32} color={config.levels.primary ? '#10B981' : '#94a3b8'} style={{marginBottom: '12px'}} />
-                <h3 style={{ fontFamily: "'Fredoka', sans-serif", margin: 0 }}>Primary School</h3>
+                <BookOpen size={28} color={config.levels.primary ? '#10B981' : '#94a3b8'} style={{marginBottom: '10px'}} />
+                <h3 style={{ fontFamily: "'Fredoka', sans-serif", margin: 0, fontSize: '18px' }}>Primary School</h3>
                 <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '14px' }}>Grades K-5</p>
               </div>
               <div 
                 onClick={() => toggleLevel('secondary')}
-                style={{ flex: 1, padding: '24px', border: `2px solid ${config.levels.secondary ? '#10B981' : '#e2e8f0'}`, borderRadius: '16px', cursor: 'pointer', backgroundColor: config.levels.secondary ? '#ecfdf5' : 'white' }}
+                style={{ flex: '1 1 220px', padding: '20px', border: `2px solid ${config.levels.secondary ? '#10B981' : '#e2e8f0'}`, borderRadius: '16px', cursor: 'pointer', backgroundColor: config.levels.secondary ? '#ecfdf5' : 'white' }}
               >
-                <GraduationCap size={32} color={config.levels.secondary ? '#10B981' : '#94a3b8'} style={{marginBottom: '12px'}} />
-                <h3 style={{ fontFamily: "'Fredoka', sans-serif", margin: 0 }}>Secondary School</h3>
+                <GraduationCap size={28} color={config.levels.secondary ? '#10B981' : '#94a3b8'} style={{marginBottom: '10px'}} />
+                <h3 style={{ fontFamily: "'Fredoka', sans-serif", margin: 0, fontSize: '18px' }}>Secondary School</h3>
                 <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '14px' }}>Grades 6-12</p>
               </div>
             </div>
 
-            <button className="btn-primary btn-lg" onClick={() => setStep(2)}>
-              <span>Next: Select Roles</span>
+            <button className="btn btn-primary-full" onClick={() => setStep(2)}>
+              <span>Next: Select Roles →</span>
             </button>
           </div>
         )}
@@ -161,28 +161,28 @@ const CreateSchool = () => {
         {/* STEP 2: Roles */}
         {step === 2 && (
           <div className="wizard-step">
-            <h2 style={{ fontFamily: "'Fredoka', sans-serif", fontSize: '24px', marginBottom: '24px' }}>2. Role Management</h2>
-            <p style={{ color: '#64748b', marginBottom: '24px' }}>Select which user types should have access to portals.</p>
+            <h2 style={{ fontFamily: "'Fredoka', sans-serif", fontSize: '22px', marginBottom: '16px' }}>2. Role Management</h2>
+            <p style={{ color: '#64748b', marginBottom: '24px', fontSize: '15px' }}>Select which user types should have access to portals.</p>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '40px' }}>
+            <div className="create-school-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '32px' }}>
               {Object.keys(config.roles).map(role => (
                 <div 
                   key={role}
                   onClick={() => toggleRole(role)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '20px', border: `2px solid ${config.roles[role] ? '#10B981' : '#e2e8f0'}`, borderRadius: '16px', cursor: 'pointer', backgroundColor: config.roles[role] ? '#ecfdf5' : 'white' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 20px', border: `2px solid ${config.roles[role] ? '#10B981' : '#e2e8f0'}`, borderRadius: '16px', cursor: 'pointer', backgroundColor: config.roles[role] ? '#ecfdf5' : 'white' }}
                 >
-                  <Users size={24} color={config.roles[role] ? '#10B981' : '#94a3b8'} />
+                  <Users size={22} color={config.roles[role] ? '#10B981' : '#94a3b8'} />
                   <div>
-                    <h3 style={{ fontFamily: "'Fredoka', sans-serif", margin: 0, textTransform: 'capitalize' }}>{role}s</h3>
+                    <h3 style={{ fontFamily: "'Fredoka', sans-serif", margin: 0, fontSize: '16px', textTransform: 'capitalize' }}>{role}s</h3>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <button className="btn-secondary btn-lg" onClick={() => setStep(1)}>Back</button>
-              <button className="btn-primary btn-lg" onClick={() => setStep(3)}>
-                <span>Next: Choose Modules</span>
+            <div className="create-school-actions" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+              <button className="btn btn-outline" style={{ flex: '1 1 120px' }} onClick={() => setStep(1)}>Back</button>
+              <button className="btn btn-primary" style={{ flex: '2 1 180px' }} onClick={() => setStep(3)}>
+                <span>Next: Choose Modules →</span>
               </button>
             </div>
           </div>
@@ -191,28 +191,28 @@ const CreateSchool = () => {
         {/* STEP 3: Modules */}
         {step === 3 && (
           <div className="wizard-step">
-            <h2 style={{ fontFamily: "'Fredoka', sans-serif", fontSize: '24px', marginBottom: '24px' }}>3. Feature Customization</h2>
-            <p style={{ color: '#64748b', marginBottom: '24px' }}>Enable only the modules your school needs. 100% customizable.</p>
+            <h2 style={{ fontFamily: "'Fredoka', sans-serif", fontSize: '22px', marginBottom: '16px' }}>3. Feature Customization</h2>
+            <p style={{ color: '#64748b', marginBottom: '24px', fontSize: '15px' }}>Enable only the modules your school needs. 100% customizable.</p>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '40px' }}>
+            <div className="create-school-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '32px' }}>
               {Object.keys(config.modules).map(mod => (
                 <div 
                   key={mod}
                   onClick={() => toggleModule(mod)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', border: `2px solid ${config.modules[mod] ? '#10B981' : '#e2e8f0'}`, borderRadius: '16px', cursor: 'pointer', backgroundColor: config.modules[mod] ? '#ecfdf5' : 'white' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px', border: `2px solid ${config.modules[mod] ? '#10B981' : '#e2e8f0'}`, borderRadius: '16px', cursor: 'pointer', backgroundColor: config.modules[mod] ? '#ecfdf5' : 'white' }}
                 >
                   <Settings size={20} color={config.modules[mod] ? '#10B981' : '#94a3b8'} />
                   <div>
-                    <h3 style={{ fontFamily: "'Fredoka', sans-serif", margin: 0, textTransform: 'capitalize' }}>{mod}</h3>
+                    <h3 style={{ fontFamily: "'Fredoka', sans-serif", margin: 0, fontSize: '16px', textTransform: 'capitalize' }}>{mod}</h3>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <button className="btn-secondary btn-lg" onClick={() => setStep(2)}>Back</button>
-              <button className="btn-primary btn-lg" onClick={() => setStep(4)}>
-                <span>Next: Branding</span>
+            <div className="create-school-actions" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+              <button className="btn btn-outline" style={{ flex: '1 1 120px' }} onClick={() => setStep(2)}>Back</button>
+              <button className="btn btn-primary" style={{ flex: '2 1 180px' }} onClick={() => setStep(4)}>
+                <span>Next: Branding →</span>
               </button>
             </div>
           </div>
@@ -221,23 +221,23 @@ const CreateSchool = () => {
         {/* STEP 4: Branding */}
         {step === 4 && (
           <div className="wizard-step">
-            <h2 style={{ fontFamily: "'Fredoka', sans-serif", fontSize: '24px', marginBottom: '24px' }}>4. Branding & Colors</h2>
-            <p style={{ color: '#64748b', marginBottom: '24px' }}>Select the primary color for your school's portals.</p>
+            <h2 style={{ fontFamily: "'Fredoka', sans-serif", fontSize: '22px', marginBottom: '16px' }}>4. Branding & Colors</h2>
+            <p style={{ color: '#64748b', marginBottom: '24px', fontSize: '15px' }}>Select the primary color for your school's portals.</p>
             
-            <div style={{ marginBottom: '40px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ marginBottom: '36px', display: 'flex', alignItems: 'center', gap: '16px' }}>
               <input 
                 type="color" 
                 value={config.primaryColor}
                 onChange={(e) => setConfig({...config, primaryColor: e.target.value})}
-                style={{ width: '60px', height: '60px', border: 'none', borderRadius: '12px', cursor: 'pointer' }}
+                style={{ width: '56px', height: '56px', border: 'none', borderRadius: '12px', cursor: 'pointer', padding: 0 }}
               />
-              <div style={{ fontSize: '18px', fontWeight: 600 }}>{config.primaryColor}</div>
+              <div style={{ fontSize: '17px', fontWeight: 600, fontFamily: 'monospace' }}>{config.primaryColor}</div>
             </div>
 
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <button className="btn-secondary btn-lg" onClick={() => setStep(3)}>Back</button>
-              <button className="btn-primary btn-lg" onClick={handleFinish} disabled={loading} style={{ backgroundColor: config.primaryColor }}>
-                <span>{loading ? 'Creating...' : 'Generate Portals'}</span>
+            <div className="create-school-actions" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+              <button className="btn btn-outline" style={{ flex: '1 1 120px' }} onClick={() => setStep(3)}>Back</button>
+              <button className="btn btn-primary" onClick={handleFinish} disabled={loading} style={{ flex: '2 1 180px', backgroundColor: config.primaryColor }}>
+                <span>{loading ? 'Creating...' : 'Generate Portals →'}</span>
               </button>
             </div>
           </div>

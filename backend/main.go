@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/google/uuid"
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
@@ -53,12 +54,17 @@ type User struct {
 }
 
 type Class struct {
-	ID        string `json:"ID"`
-	SchoolID  string `json:"schoolId"`
-	Name      string `json:"name"`
-	Subject   string `json:"subject"`
-	TeacherID string `json:"teacherId"`
-	Year      string `json:"year"`
+	ID           string  `json:"ID"`
+	SchoolID     string  `json:"schoolId"`
+	Name         string  `json:"name"`
+	Subsystem    string  `json:"subsystem"`
+	Level        string  `json:"level"`
+	Section      string  `json:"section"`
+	PassMark     float64 `json:"passMark"`
+	AcademicYear string  `json:"academicYear"`
+	Subject      string  `json:"subject"`
+	TeacherID    string  `json:"teacherId"`
+	Year         string  `json:"year"`
 }
 
 type ParentStudentLink struct {
@@ -80,6 +86,7 @@ type CourseSubject struct {
 	ClassID     string  `json:"classId"`
 	Name        string  `json:"name"`
 	Coefficient float64 `json:"coefficient"`
+	TeacherID   string  `json:"teacherId"`
 }
 
 type Grade struct {
@@ -139,15 +146,25 @@ var (
 const dsn = "host=localhost port=5432 user=postgres password=Black@123 dbname=edusphere sslmode=disable"
 
 func connectDB() {
-	db, err := sql.Open("postgres", dsn)
+	if err := godotenv.Load(); err != nil {
+		log.Println("[Env] No .env file found or error loading, continuing with default environment")
+	}
+
+	dbUrl := os.Getenv("DATABASE_URL")
+	if dbUrl == "" {
+		dbUrl = dsn // fallback to local
+	}
+
+	db, err := sql.Open("postgres", dbUrl)
 	if err != nil {
 		log.Printf("[DB] Failed to open DB: %v. Running offline.", err)
 		setOffline()
 		return
 	}
-	db.SetMaxOpenConns(10)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(10)
+	db.SetConnMaxLifetime(10 * time.Minute)
+	db.SetConnMaxIdleTime(2 * time.Minute)
 
 	if err = db.Ping(); err != nil {
 		log.Printf("[DB] Cannot reach PostgreSQL: %v. Running offline.", err)
@@ -195,6 +212,43 @@ func migrateSchema() {
 		`CREATE TABLE IF NOT EXISTS parent_student_links (id VARCHAR(36) PRIMARY KEY, parent_id VARCHAR(36) NOT NULL, student_id VARCHAR(36) NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS terms (id VARCHAR(36) PRIMARY KEY, school_id VARCHAR(36), name TEXT NOT NULL, year TEXT NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS course_subjects (id VARCHAR(36) PRIMARY KEY, school_id VARCHAR(36), class_id VARCHAR(36), name TEXT NOT NULL, coefficient REAL NOT NULL)`,
+		// Multi-sequence mark entry table
+		`CREATE TABLE IF NOT EXISTS marks_entry (
+			id VARCHAR(36) PRIMARY KEY,
+			school_id VARCHAR(36) NOT NULL,
+			teacher_id VARCHAR(36),
+			subject_id VARCHAR(36) NOT NULL,
+			class_id VARCHAR(36) NOT NULL,
+			academic_year TEXT NOT NULL DEFAULT '',
+			term INTEGER NOT NULL DEFAULT 1,
+			student_id VARCHAR(36) NOT NULL,
+			sequence1 REAL,
+			sequence2 REAL,
+			sequence3 REAL,
+			sequence4 REAL,
+			exam REAL,
+			created_at TIMESTAMP DEFAULT NOW(),
+			updated_at TIMESTAMP DEFAULT NOW(),
+			UNIQUE(student_id, subject_id, class_id, term, academic_year)
+		)`,
+		// Report cards table
+		`CREATE TABLE IF NOT EXISTS report_cards (
+			id VARCHAR(36) PRIMARY KEY,
+			school_id VARCHAR(36) NOT NULL,
+			student_id VARCHAR(36) NOT NULL,
+			class_id VARCHAR(36) NOT NULL,
+			academic_year TEXT NOT NULL DEFAULT '',
+			term INTEGER NOT NULL DEFAULT 1,
+			term_average REAL DEFAULT 0,
+			class_average REAL DEFAULT 0,
+			rank INTEGER DEFAULT 0,
+			status TEXT DEFAULT 'draft',
+			data_json TEXT DEFAULT '{}',
+			generated_at TIMESTAMP DEFAULT NOW(),
+			generated_by_admin_id VARCHAR(36),
+			published_at TIMESTAMP,
+			UNIQUE(student_id, class_id, term, academic_year)
+		)`,
 		`CREATE TABLE IF NOT EXISTS grades (id VARCHAR(36) PRIMARY KEY, school_id VARCHAR(36), term_id VARCHAR(36), subject_id VARCHAR(36), student_id VARCHAR(36), score REAL NOT NULL, UNIQUE(term_id, subject_id, student_id))`,
 		`CREATE TABLE IF NOT EXISTS academic_years (id VARCHAR(36) PRIMARY KEY, school_id VARCHAR(36), year_name TEXT NOT NULL, is_current BOOLEAN DEFAULT false)`,
 		`CREATE TABLE IF NOT EXISTS sequences (id VARCHAR(36) PRIMARY KEY, school_id VARCHAR(36), name TEXT NOT NULL, is_locked BOOLEAN DEFAULT false)`,
@@ -204,7 +258,42 @@ func migrateSchema() {
 		`CREATE TABLE IF NOT EXISTS announcements (id VARCHAR(36) PRIMARY KEY, school_id VARCHAR(36), title TEXT, content TEXT, author_id VARCHAR(36), created_at TIMESTAMP)`,
 		`CREATE TABLE IF NOT EXISTS assignments (id VARCHAR(36) PRIMARY KEY, school_id VARCHAR(36), title TEXT, class_id VARCHAR(36), due_date TIMESTAMP)`,
 		`CREATE TABLE IF NOT EXISTS messages (id VARCHAR(36) PRIMARY KEY, school_id VARCHAR(36), sender_id VARCHAR(36), recipient_id VARCHAR(36), body TEXT, sent_at TIMESTAMP)`,
-		`CREATE TABLE IF NOT EXISTS attendance (id VARCHAR(36) PRIMARY KEY, school_id VARCHAR(36), student_id VARCHAR(36), date DATE, status TEXT)`,
+		`CREATE TABLE IF NOT EXISTS attendance (id VARCHAR(36) PRIMARY KEY, school_id VARCHAR(36), class_id VARCHAR(36) DEFAULT '', student_id VARCHAR(36), date DATE, status TEXT, teacher_id VARCHAR(36) DEFAULT '')`,
+		`CREATE TABLE IF NOT EXISTS assignment_submissions (
+			id VARCHAR(36) PRIMARY KEY,
+			assignment_id VARCHAR(36) NOT NULL,
+			school_id VARCHAR(36) NOT NULL,
+			class_id VARCHAR(36) DEFAULT '',
+			student_id VARCHAR(36) NOT NULL,
+			student_name TEXT DEFAULT '',
+			content TEXT DEFAULT '',
+			file_url TEXT DEFAULT '',
+			submitted_at TEXT DEFAULT '',
+			grade REAL,
+			feedback TEXT DEFAULT '',
+			status TEXT DEFAULT 'submitted',
+			UNIQUE(assignment_id, student_id)
+		)`,
+		`ALTER TABLE classes ADD COLUMN IF NOT EXISTS subsystem TEXT DEFAULT 'anglophone'`,
+		`ALTER TABLE classes ADD COLUMN IF NOT EXISTS level TEXT DEFAULT ''`,
+		`ALTER TABLE classes ADD COLUMN IF NOT EXISTS section TEXT DEFAULT ''`,
+		`ALTER TABLE classes ADD COLUMN IF NOT EXISTS pass_mark REAL DEFAULT 10.0`,
+		`ALTER TABLE classes ADD COLUMN IF NOT EXISTS academic_year TEXT DEFAULT '2026/2027'`,
+		`ALTER TABLE classes ADD COLUMN IF NOT EXISTS subject TEXT DEFAULT ''`,
+		`ALTER TABLE classes ADD COLUMN IF NOT EXISTS teacher_id VARCHAR(36) DEFAULT ''`,
+		`ALTER TABLE classes ADD COLUMN IF NOT EXISTS year TEXT DEFAULT ''`,
+		`ALTER TABLE attendance ADD COLUMN IF NOT EXISTS class_id VARCHAR(36) DEFAULT ''`,
+		`ALTER TABLE attendance ADD COLUMN IF NOT EXISTS teacher_id VARCHAR(36) DEFAULT ''`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_attendance_unique ON attendance(class_id, student_id, date)`,
+		`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS teacher_id VARCHAR(36) DEFAULT ''`,
+		`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS teacher_name TEXT DEFAULT ''`,
+		`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''`,
+		`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS due_date TEXT DEFAULT ''`,
+		`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS max_points REAL DEFAULT 20.0`,
+		`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT ''`,
+		`ALTER TABLE course_subjects ADD COLUMN IF NOT EXISTS teacher_id VARCHAR(36)`,
+		`ALTER TABLE marks_entry ADD COLUMN IF NOT EXISTS coefficient REAL DEFAULT 1.0`,
+		`ALTER TABLE schools ADD COLUMN IF NOT EXISTS subsystem TEXT DEFAULT 'anglophone'`,
 	}
 	for _, q := range queries {
 		if _, err := pgDB.Exec(q); err != nil {
@@ -503,12 +592,18 @@ func main() {
 	r.Get("/api/classes", listClasses)
 	r.Post("/api/classes", createClass)
 	r.Delete("/api/classes/{id}", deleteClass)
+	r.Put("/api/classes/{id}/pass-mark", updateClassPassMark)
+	r.Post("/api/classes/rollover", rolloverClasses)
+	r.Get("/api/course-subjects", listCourseSubjects)
+	r.Post("/api/course-subjects", saveCourseSubject)
 	r.Post("/api/parents/generate", generateParent)
 	r.Post("/api/parents/claim", claimParentAccount)
 	r.Post("/api/parents/link-child", linkChildToParent)
 	r.Get("/api/parents/{id}/children", getParentChildren)
-
 	r.Post("/api/marks/bulk", bulkUploadMarks)
+	r.Post("/api/marks/save-batch", saveMarksBatch)
+	r.Get("/api/marks/teacher", getTeacherMarks)
+	r.Get("/api/marks/class/{classId}/{term}", getClassMarks)
 	r.Post("/api/marks", upsertMark)
 	r.Get("/api/marks", listMarks)
 	r.Get("/api/marks/student/{id}", getStudentMarks)
@@ -519,6 +614,10 @@ func main() {
 	r.Post("/api/grades/bulk", bulkUploadGrades)
 	r.Get("/api/report-cards/student/{id}", getStudentReportCard)
 	r.Get("/api/report-cards/class/{class_id}", getClassReportCards)
+	r.Post("/api/report-cards/generate-single", generateSingleReportCard)
+	r.Post("/api/report-cards/generate-bulk", generateBulkReportCards)
+	r.Put("/api/report-cards/{id}/publish", publishReportCard)
+	r.Get("/api/report-cards/list", listReportCards)
 	r.Post("/api/report-cards/templates", saveReportCardTemplate)
 
 	// Enrollments
@@ -535,6 +634,10 @@ func main() {
 	r.Get("/api/assignments", listAssignments)
 	r.Post("/api/assignments", createAssignment)
 	r.Delete("/api/assignments/{id}", deleteAssignment)
+	r.Post("/api/assignments/submit", submitAssignment)
+	r.Get("/api/assignments/{id}/submissions", listAssignmentSubmissions)
+	r.Get("/api/assignments/student-submissions", listStudentSubmissions)
+	r.Put("/api/assignments/submissions/{id}/grade", gradeAssignmentSubmission)
 
 	// Messages
 	r.Get("/api/messages", listMessages)
@@ -631,11 +734,21 @@ func listSchools(w http.ResponseWriter, r *http.Request) {
 	}
 	var list []SS
 	if isOnline() {
-		rows, _ := pgDB.Query(`SELECT id, name FROM schools`)
+		rows, err := pgDB.Query(`SELECT id, name FROM schools`)
+		if err != nil || rows == nil {
+			if err != nil {
+				log.Printf("[Schools] listSchools query failed: %v", err)
+			}
+			jsonResp(w, []SS{})
+			return
+		}
 		defer rows.Close()
 		for rows.Next() {
 			var s SS
-			rows.Scan(&s.ID, &s.Name)
+			if err := rows.Scan(&s.ID, &s.Name); err != nil {
+				log.Printf("[Schools] scan failed: %v", err)
+				continue
+			}
 			list = append(list, s)
 		}
 	} else {
@@ -804,11 +917,21 @@ func listUsers(w http.ResponseWriter, r *http.Request) {
 		if roleFilter != "" {
 			q += fmt.Sprintf(" AND LOWER(role)=LOWER($%d)", n); args = append(args, roleFilter); n++
 		}
-		rows, _ := pgDB.Query(q, args...)
+		rows, err := pgDB.Query(q, args...)
+		if err != nil || rows == nil {
+			if err != nil {
+				log.Printf("[Users] listUsers query failed: %v", err)
+			}
+			jsonResp(w, []SafeUser{})
+			return
+		}
 		defer rows.Close()
 		for rows.Next() {
 			var u SafeUser
-			rows.Scan(&u.ID, &u.Name, &u.Email, &u.Role, &u.FirstLogin)
+			if err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Role, &u.FirstLogin); err != nil {
+				log.Printf("[Users] scan failed: %v", err)
+				continue
+			}
 			list = append(list, u)
 		}
 	} else {
@@ -912,18 +1035,22 @@ func deleteUser(w http.ResponseWriter, r *http.Request) {
 
 func listClasses(w http.ResponseWriter, r *http.Request) {
 	schoolID := r.URL.Query().Get("schoolId")
+	academicYear := r.URL.Query().Get("academicYear")
 	if schoolID == "undefined" || schoolID == "null" { schoolID = "" }
 	var list []Class
 	if isOnline() {
-		q := `SELECT id, school_id, name, COALESCE(subject,''), COALESCE(teacher_id,''), COALESCE(year,'') FROM classes WHERE 1=1`
+		q := `SELECT id, school_id, name, COALESCE(subsystem,'anglophone'), COALESCE(level,''), COALESCE(section,''), COALESCE(pass_mark, 10.0), COALESCE(academic_year,'2026/2027'), COALESCE(subject,''), COALESCE(teacher_id,''), COALESCE(year,'') FROM classes WHERE 1=1`
 		args := []interface{}{}
-		if schoolID != "" { q += " AND school_id=$1"; args = append(args, schoolID) }
+		n := 1
+		if schoolID != "" { q += fmt.Sprintf(" AND school_id=$%d", n); args = append(args, schoolID); n++ }
+		if academicYear != "" { q += fmt.Sprintf(" AND academic_year=$%d", n); args = append(args, academicYear); n++ }
+		q += " ORDER BY level ASC, name ASC"
 		rows, err := pgDB.Query(q, args...)
 		if err == nil && rows != nil {
 			defer rows.Close()
 			for rows.Next() {
 				var c Class
-				rows.Scan(&c.ID, &c.SchoolID, &c.Name, &c.Subject, &c.TeacherID, &c.Year)
+				rows.Scan(&c.ID, &c.SchoolID, &c.Name, &c.Subsystem, &c.Level, &c.Section, &c.PassMark, &c.AcademicYear, &c.Subject, &c.TeacherID, &c.Year)
 				list = append(list, c)
 			}
 		}
@@ -932,6 +1059,7 @@ func listClasses(w http.ResponseWriter, r *http.Request) {
 		defer localDBMu.RUnlock()
 		for _, c := range localDB.Classes {
 			if schoolID != "" && c.SchoolID != schoolID { continue }
+			if academicYear != "" && c.AcademicYear != "" && c.AcademicYear != academicYear { continue }
 			list = append(list, c)
 		}
 	}
@@ -940,11 +1068,16 @@ func listClasses(w http.ResponseWriter, r *http.Request) {
 }
 
 type CreateClassRequest struct {
-	SchoolID  string `json:"schoolId"`
-	Name      string `json:"name"`
-	Subject   string `json:"subject"`
-	TeacherID string `json:"teacherId"`
-	Year      string `json:"year"`
+	SchoolID     string  `json:"schoolId"`
+	Name         string  `json:"name"`
+	Subsystem    string  `json:"subsystem"`
+	Level        string  `json:"level"`
+	Section      string  `json:"section"`
+	PassMark     float64 `json:"passMark"`
+	AcademicYear string  `json:"academicYear"`
+	Subject      string  `json:"subject"`
+	TeacherID    string  `json:"teacherId"`
+	Year         string  `json:"year"`
 }
 
 func createClass(w http.ResponseWriter, r *http.Request) {
@@ -953,9 +1086,35 @@ func createClass(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	c := Class{ID: uuid.New().String(), SchoolID: req.SchoolID, Name: req.Name, Subject: req.Subject, TeacherID: req.TeacherID, Year: req.Year}
+	if req.Name == "" {
+		http.Error(w, "Class name is required", http.StatusBadRequest)
+		return
+	}
+	if req.PassMark <= 0 { req.PassMark = 10.0 }
+	if req.AcademicYear == "" { req.AcademicYear = "2026/2027" }
+	if req.Subsystem == "" { req.Subsystem = "anglophone" }
+	
+	c := Class{
+		ID:           uuid.New().String(),
+		SchoolID:     req.SchoolID,
+		Name:         req.Name,
+		Subsystem:    req.Subsystem,
+		Level:        req.Level,
+		Section:      req.Section,
+		PassMark:     req.PassMark,
+		AcademicYear: req.AcademicYear,
+		Subject:      req.Subject,
+		TeacherID:    req.TeacherID,
+		Year:         req.Year,
+	}
 	if isOnline() {
-		pgDB.Exec(`INSERT INTO classes(id,school_id,name,subject,teacher_id,year) VALUES($1,$2,$3,$4,$5,$6)`, c.ID, c.SchoolID, c.Name, c.Subject, c.TeacherID, c.Year)
+		_, err := pgDB.Exec(`INSERT INTO classes(id,school_id,name,subsystem,level,section,pass_mark,academic_year,subject,teacher_id,year) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+			c.ID, c.SchoolID, c.Name, c.Subsystem, c.Level, c.Section, c.PassMark, c.AcademicYear, c.Subject, c.TeacherID, c.Year)
+		if err != nil {
+			log.Printf("[Classes] Create error: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	} else {
 		localDBMu.Lock()
 		localDB.Classes = append(localDB.Classes, c)
@@ -964,6 +1123,115 @@ func createClass(w http.ResponseWriter, r *http.Request) {
 		enqueue("CREATE_CLASS", c)
 	}
 	jsonResp(w, c)
+}
+
+func updateClassPassMark(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var req struct {
+		PassMark float64 `json:"passMark"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.PassMark <= 0 { req.PassMark = 10.0 }
+	if isOnline() {
+		pgDB.Exec(`UPDATE classes SET pass_mark=$1 WHERE id=$2`, req.PassMark, id)
+	} else {
+		localDBMu.Lock()
+		for i, c := range localDB.Classes {
+			if c.ID == id {
+				localDB.Classes[i].PassMark = req.PassMark
+				break
+			}
+		}
+		saveLocalDB()
+		localDBMu.Unlock()
+	}
+	jsonResp(w, map[string]interface{}{"id": id, "passMark": req.PassMark, "message": "Pass mark updated successfully"})
+}
+
+type RolloverRequest struct {
+	SchoolID       string `json:"schoolId"`
+	FromYear       string `json:"fromYear"`
+	ToYear         string `json:"toYear"`
+	IncludeTeacher bool   `json:"includeTeacher"`
+}
+
+func rolloverClasses(w http.ResponseWriter, r *http.Request) {
+	var req RolloverRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.SchoolID == "" || req.FromYear == "" || req.ToYear == "" {
+		http.Error(w, "schoolId, fromYear, and toYear are required", http.StatusBadRequest)
+		return
+	}
+	copied := 0
+	if isOnline() {
+		rows, err := pgDB.Query(`SELECT name, subsystem, level, section, pass_mark, subject, teacher_id, year FROM classes WHERE school_id=$1 AND academic_year=$2`, req.SchoolID, req.FromYear)
+		if err == nil && rows != nil {
+			defer rows.Close()
+			for rows.Next() {
+				var name, subsystem, level, section, subject, teacherID, year string
+				var passMark float64
+				rows.Scan(&name, &subsystem, &level, &section, &passMark, &subject, &teacherID, &year)
+				if !req.IncludeTeacher { teacherID = "" }
+				newID := uuid.New().String()
+				// Construct new name reflecting the new year if it contained the old year
+				newName := name
+				if len(req.FromYear) > 0 && len(req.ToYear) > 0 {
+					newName = strings.ReplaceAll(name, req.FromYear, req.ToYear)
+				}
+				pgDB.Exec(`INSERT INTO classes(id,school_id,name,subsystem,level,section,pass_mark,academic_year,subject,teacher_id,year) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+					newID, req.SchoolID, newName, subsystem, level, section, passMark, req.ToYear, subject, teacherID, year)
+				copied++
+			}
+		}
+	}
+	jsonResp(w, map[string]interface{}{"copied": copied, "message": fmt.Sprintf("Successfully rolled over %d classes to %s", copied, req.ToYear)})
+}
+
+func listCourseSubjects(w http.ResponseWriter, r *http.Request) {
+	classID := r.URL.Query().Get("classId")
+	schoolID := r.URL.Query().Get("schoolId")
+	var list []CourseSubject
+	if isOnline() {
+		q := `SELECT id, school_id, class_id, name, coefficient, COALESCE(teacher_id,'') FROM course_subjects WHERE 1=1`
+		args := []interface{}{}
+		n := 1
+		if classID != "" { q += fmt.Sprintf(" AND class_id=$%d", n); args = append(args, classID); n++ }
+		if schoolID != "" { q += fmt.Sprintf(" AND school_id=$%d", n); args = append(args, schoolID); n++ }
+		rows, err := pgDB.Query(q, args...)
+		if err == nil && rows != nil {
+			defer rows.Close()
+			for rows.Next() {
+				var s CourseSubject
+				rows.Scan(&s.ID, &s.SchoolID, &s.ClassID, &s.Name, &s.Coefficient, &s.TeacherID)
+				list = append(list, s)
+			}
+		}
+	}
+	if list == nil { list = []CourseSubject{} }
+	jsonResp(w, list)
+}
+
+func saveCourseSubject(w http.ResponseWriter, r *http.Request) {
+	var s CourseSubject
+	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if s.Coefficient <= 0 { s.Coefficient = 1.0 }
+	if s.ID == "" { s.ID = uuid.New().String() }
+	if isOnline() {
+		pgDB.Exec(`INSERT INTO course_subjects(id, school_id, class_id, name, coefficient, teacher_id)
+			VALUES($1,$2,$3,$4,$5,$6)
+			ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, coefficient=EXCLUDED.coefficient, teacher_id=EXCLUDED.teacher_id`,
+			s.ID, s.SchoolID, s.ClassID, s.Name, s.Coefficient, s.TeacherID)
+	}
+	jsonResp(w, s)
 }
 
 func deleteClass(w http.ResponseWriter, r *http.Request) {
@@ -1112,11 +1380,21 @@ func getParentChildren(w http.ResponseWriter, r *http.Request) {
 	var children []ChildData
 
 	if isOnline() {
-		rows, _ := pgDB.Query(`SELECT u.id, u.name, u.school_id, COALESCE(s.name,'') FROM parent_student_links l JOIN users u ON l.student_id=u.id LEFT JOIN schools s ON u.school_id=s.id WHERE l.parent_id=$1`, parentID)
+		rows, err := pgDB.Query(`SELECT u.id, u.name, u.school_id, COALESCE(s.name,'') FROM parent_student_links l JOIN users u ON l.student_id=u.id LEFT JOIN schools s ON u.school_id=s.id WHERE l.parent_id=$1`, parentID)
+		if err != nil || rows == nil {
+			if err != nil {
+				log.Printf("[ParentChildren] query failed: %v", err)
+			}
+			jsonResp(w, []ChildData{})
+			return
+		}
 		defer rows.Close()
 		for rows.Next() {
 			var c ChildData
-			rows.Scan(&c.ID, &c.Name, &c.SchoolID, &c.SchoolName)
+			if err := rows.Scan(&c.ID, &c.Name, &c.SchoolID, &c.SchoolName); err != nil {
+				log.Printf("[ParentChildren] scan failed: %v", err)
+				continue
+			}
 			children = append(children, c)
 		}
 	} else {
@@ -1419,16 +1697,33 @@ func deleteAnnouncement(w http.ResponseWriter, r *http.Request) {
 // =====================================================================
 
 type Assignment struct {
-	ID          string `json:"id"`
-	SchoolID    string `json:"schoolId"`
-	ClassID     string `json:"classId"`
-	ClassName   string `json:"className"`
-	TeacherID   string `json:"teacherId"`
-	TeacherName string `json:"teacherName"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	DueDate     string `json:"dueDate"`
-	CreatedAt   string `json:"createdAt"`
+	ID              string  `json:"id"`
+	SchoolID        string  `json:"schoolId"`
+	ClassID         string  `json:"classId"`
+	ClassName       string  `json:"className"`
+	TeacherID       string  `json:"teacherId"`
+	TeacherName     string  `json:"teacherName"`
+	Title           string  `json:"title"`
+	Description     string  `json:"description"`
+	DueDate         string  `json:"dueDate"`
+	MaxPoints       float64 `json:"maxPoints"`
+	CreatedAt       string  `json:"createdAt"`
+	SubmissionCount int     `json:"submissionCount"`
+}
+
+type AssignmentSubmission struct {
+	ID           string   `json:"id"`
+	AssignmentID string   `json:"assignmentId"`
+	SchoolID     string   `json:"schoolId"`
+	ClassID      string   `json:"classId"`
+	StudentID    string   `json:"studentId"`
+	StudentName  string   `json:"studentName"`
+	Content      string   `json:"content"`
+	FileURL      string   `json:"fileUrl"`
+	SubmittedAt  string   `json:"submittedAt"`
+	Grade        *float64 `json:"grade"`
+	Feedback     string   `json:"feedback"`
+	Status       string   `json:"status"` // "submitted", "graded"
 }
 
 func listAssignments(w http.ResponseWriter, r *http.Request) {
@@ -1439,28 +1734,35 @@ func listAssignments(w http.ResponseWriter, r *http.Request) {
 	if isOnline() {
 		var q string; var args []interface{}
 		if studentID != "" {
-			q = `SELECT a.id,a.school_id,a.class_id,COALESCE(c.name,''),a.teacher_id,COALESCE(u.name,''),a.title,a.description,a.due_date,a.created_at
+			q = `SELECT a.id, a.school_id, a.class_id, COALESCE(c.name,''), a.teacher_id, COALESCE(u.name, a.teacher_name, ''), a.title, COALESCE(a.description,''), COALESCE(a.due_date::text,''), COALESCE(a.max_points, 20.0), COALESCE(a.created_at::text,''),
+				(SELECT COUNT(*) FROM assignment_submissions WHERE assignment_id=a.id)
 				FROM assignments a LEFT JOIN classes c ON a.class_id=c.id LEFT JOIN users u ON a.teacher_id=u.id
-				WHERE a.school_id=$1 AND a.class_id IN (SELECT class_id FROM enrollments WHERE student_id=$2)
+				WHERE (a.school_id=$1 OR $1='') AND (a.class_id IN (SELECT class_id FROM enrollments WHERE student_id=$2) OR a.class_id IN (SELECT id FROM classes WHERE school_id=$1))
 				ORDER BY a.due_date ASC`
 			args = []interface{}{schoolID, studentID}
 		} else if classID != "" {
-			q = `SELECT a.id,a.school_id,a.class_id,COALESCE(c.name,''),a.teacher_id,COALESCE(u.name,''),a.title,a.description,a.due_date,a.created_at
+			q = `SELECT a.id, a.school_id, a.class_id, COALESCE(c.name,''), a.teacher_id, COALESCE(u.name, a.teacher_name, ''), a.title, COALESCE(a.description,''), COALESCE(a.due_date::text,''), COALESCE(a.max_points, 20.0), COALESCE(a.created_at::text,''),
+				(SELECT COUNT(*) FROM assignment_submissions WHERE assignment_id=a.id)
 				FROM assignments a LEFT JOIN classes c ON a.class_id=c.id LEFT JOIN users u ON a.teacher_id=u.id
 				WHERE a.class_id=$1 ORDER BY a.due_date ASC`
 			args = []interface{}{classID}
 		} else {
-			q = `SELECT a.id,a.school_id,a.class_id,COALESCE(c.name,''),a.teacher_id,COALESCE(u.name,''),a.title,a.description,a.due_date,a.created_at
+			q = `SELECT a.id, a.school_id, a.class_id, COALESCE(c.name,''), a.teacher_id, COALESCE(u.name, a.teacher_name, ''), a.title, COALESCE(a.description,''), COALESCE(a.due_date::text,''), COALESCE(a.max_points, 20.0), COALESCE(a.created_at::text,''),
+				(SELECT COUNT(*) FROM assignment_submissions WHERE assignment_id=a.id)
 				FROM assignments a LEFT JOIN classes c ON a.class_id=c.id LEFT JOIN users u ON a.teacher_id=u.id
-				WHERE a.school_id=$1 ORDER BY a.due_date ASC`
+				WHERE (a.school_id=$1 OR $1='') ORDER BY a.due_date ASC`
 			args = []interface{}{schoolID}
 		}
 		rows, err := pgDB.Query(q, args...)
-		if err != nil { jsonResp(w, []Assignment{}); return }
+		if err != nil {
+			log.Printf("[Assignments] List error: %v", err)
+			jsonResp(w, []Assignment{})
+			return
+		}
 		defer rows.Close()
 		for rows.Next() {
 			var a Assignment
-			rows.Scan(&a.ID, &a.SchoolID, &a.ClassID, &a.ClassName, &a.TeacherID, &a.TeacherName, &a.Title, &a.Description, &a.DueDate, &a.CreatedAt)
+			rows.Scan(&a.ID, &a.SchoolID, &a.ClassID, &a.ClassName, &a.TeacherID, &a.TeacherName, &a.Title, &a.Description, &a.DueDate, &a.MaxPoints, &a.CreatedAt, &a.SubmissionCount)
 			list = append(list, a)
 		}
 	}
@@ -1469,32 +1771,151 @@ func listAssignments(w http.ResponseWriter, r *http.Request) {
 }
 
 type CreateAssignmentRequest struct {
-	SchoolID    string `json:"schoolId"`
-	ClassID     string `json:"classId"`
-	TeacherID   string `json:"teacherId"`
-	TeacherName string `json:"teacherName"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	DueDate     string `json:"dueDate"`
+	SchoolID    string  `json:"schoolId"`
+	ClassID     string  `json:"classId"`
+	TeacherID   string  `json:"teacherId"`
+	TeacherName string  `json:"teacherName"`
+	Title       string  `json:"title"`
+	Description string  `json:"description"`
+	DueDate     string  `json:"dueDate"`
+	MaxPoints   float64 `json:"maxPoints"`
 }
 
 func createAssignment(w http.ResponseWriter, r *http.Request) {
 	var req CreateAssignmentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil { http.Error(w, err.Error(), http.StatusBadRequest); return }
+	if req.MaxPoints <= 0 { req.MaxPoints = 20.0 }
 	id := uuid.New().String()
 	now := time.Now().Format(time.RFC3339)
 	if isOnline() {
-		_, err := pgDB.Exec(`INSERT INTO assignments(id,school_id,class_id,teacher_id,teacher_name,title,description,due_date,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-			id, req.SchoolID, req.ClassID, req.TeacherID, req.TeacherName, req.Title, req.Description, req.DueDate, now)
-		if err != nil { http.Error(w, err.Error(), http.StatusInternalServerError); return }
+		_, err := pgDB.Exec(`INSERT INTO assignments(id,school_id,class_id,teacher_id,teacher_name,title,description,due_date,max_points,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+			id, req.SchoolID, req.ClassID, req.TeacherID, req.TeacherName, req.Title, req.Description, req.DueDate, req.MaxPoints, now)
+		if err != nil {
+			log.Printf("[Assignments] Create error: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
-	jsonResp(w, Assignment{ID: id, SchoolID: req.SchoolID, ClassID: req.ClassID, TeacherID: req.TeacherID, TeacherName: req.TeacherName, Title: req.Title, Description: req.Description, DueDate: req.DueDate, CreatedAt: now})
+	jsonResp(w, Assignment{ID: id, SchoolID: req.SchoolID, ClassID: req.ClassID, TeacherID: req.TeacherID, TeacherName: req.TeacherName, Title: req.Title, Description: req.Description, DueDate: req.DueDate, MaxPoints: req.MaxPoints, CreatedAt: now})
 }
 
 func deleteAssignment(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	if isOnline() { pgDB.Exec(`DELETE FROM assignments WHERE id=$1`, id) }
+	if isOnline() {
+		pgDB.Exec(`DELETE FROM assignment_submissions WHERE assignment_id=$1`, id)
+		pgDB.Exec(`DELETE FROM assignments WHERE id=$1`, id)
+	}
 	jsonResp(w, map[string]string{"message": "Deleted"})
+}
+
+type SubmitAssignmentRequest struct {
+	AssignmentID string `json:"assignmentId"`
+	SchoolID     string `json:"schoolId"`
+	ClassID      string `json:"classId"`
+	StudentID    string `json:"studentId"`
+	StudentName  string `json:"studentName"`
+	Content      string `json:"content"`
+	FileURL      string `json:"fileUrl"`
+}
+
+func submitAssignment(w http.ResponseWriter, r *http.Request) {
+	var req SubmitAssignmentRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	id := uuid.New().String()
+	now := time.Now().Format(time.RFC3339)
+	if isOnline() {
+		_, err := pgDB.Exec(`INSERT INTO assignment_submissions(id, assignment_id, school_id, class_id, student_id, student_name, content, file_url, submitted_at, status)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'submitted')
+			ON CONFLICT (assignment_id, student_id) DO UPDATE SET
+			content=EXCLUDED.content, file_url=EXCLUDED.file_url, submitted_at=EXCLUDED.submitted_at, status='submitted'`,
+			id, req.AssignmentID, req.SchoolID, req.ClassID, req.StudentID, req.StudentName, req.Content, req.FileURL, now)
+		if err != nil {
+			log.Printf("[Assignments] Submit error: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	jsonResp(w, map[string]interface{}{"success": true, "message": "Assignment submitted successfully", "submittedAt": now})
+}
+
+func listAssignmentSubmissions(w http.ResponseWriter, r *http.Request) {
+	assignmentID := chi.URLParam(r, "id")
+	var list []AssignmentSubmission
+	if isOnline() {
+		rows, err := pgDB.Query(`SELECT id, assignment_id, school_id, COALESCE(class_id,''), student_id, COALESCE(student_name,''), COALESCE(content,''), COALESCE(file_url,''), COALESCE(submitted_at::text,''), grade, COALESCE(feedback,''), COALESCE(status,'submitted')
+			FROM assignment_submissions WHERE assignment_id=$1 ORDER BY submitted_at DESC`, assignmentID)
+		if err == nil && rows != nil {
+			defer rows.Close()
+			for rows.Next() {
+				var s AssignmentSubmission
+				var g sql.NullFloat64
+				rows.Scan(&s.ID, &s.AssignmentID, &s.SchoolID, &s.ClassID, &s.StudentID, &s.StudentName, &s.Content, &s.FileURL, &s.SubmittedAt, &g, &s.Feedback, &s.Status)
+				if g.Valid {
+					v := g.Float64
+					s.Grade = &v
+				}
+				list = append(list, s)
+			}
+		}
+	}
+	if list == nil { list = []AssignmentSubmission{} }
+	jsonResp(w, list)
+}
+
+func listStudentSubmissions(w http.ResponseWriter, r *http.Request) {
+	studentID := r.URL.Query().Get("studentId")
+	assignmentID := r.URL.Query().Get("assignmentId")
+	var list []AssignmentSubmission
+	if isOnline() {
+		q := `SELECT id, assignment_id, school_id, COALESCE(class_id,''), student_id, COALESCE(student_name,''), COALESCE(content,''), COALESCE(file_url,''), COALESCE(submitted_at::text,''), grade, COALESCE(feedback,''), COALESCE(status,'submitted')
+			FROM assignment_submissions WHERE 1=1`
+		args := []interface{}{}
+		n := 1
+		if studentID != "" { q += fmt.Sprintf(" AND student_id=$%d", n); args = append(args, studentID); n++ }
+		if assignmentID != "" { q += fmt.Sprintf(" AND assignment_id=$%d", n); args = append(args, assignmentID); n++ }
+		rows, err := pgDB.Query(q, args...)
+		if err == nil && rows != nil {
+			defer rows.Close()
+			for rows.Next() {
+				var s AssignmentSubmission
+				var g sql.NullFloat64
+				rows.Scan(&s.ID, &s.AssignmentID, &s.SchoolID, &s.ClassID, &s.StudentID, &s.StudentName, &s.Content, &s.FileURL, &s.SubmittedAt, &g, &s.Feedback, &s.Status)
+				if g.Valid {
+					v := g.Float64
+					s.Grade = &v
+				}
+				list = append(list, s)
+			}
+		}
+	}
+	if list == nil { list = []AssignmentSubmission{} }
+	jsonResp(w, list)
+}
+
+type GradeSubmissionRequest struct {
+	Grade    float64 `json:"grade"`
+	Feedback string  `json:"feedback"`
+}
+
+func gradeAssignmentSubmission(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var req GradeSubmissionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if isOnline() {
+		_, err := pgDB.Exec(`UPDATE assignment_submissions SET grade=$1, feedback=$2, status='graded' WHERE id=$3`, req.Grade, req.Feedback, id)
+		if err != nil {
+			log.Printf("[Assignments] Grade error: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	jsonResp(w, map[string]interface{}{"success": true, "message": "Assignment graded successfully", "grade": req.Grade, "feedback": req.Feedback})
 }
 
 // =====================================================================
@@ -1522,12 +1943,12 @@ func listMessages(w http.ResponseWriter, r *http.Request) {
 	if isOnline() {
 		var q string; var args []interface{}
 		if box == "sent" {
-			q = `SELECT m.id,m.school_id,m.sender_id,COALESCE(su.name,''),COALESCE(su.role,''),m.recipient_id,COALESCE(ru.name,''),m.subject,m.body,m.is_read,m.created_at
+			q = `SELECT m.id,m.school_id,m.sender_id,COALESCE(su.name,''),COALESCE(su.role,''),m.recipient_id,COALESCE(ru.name,''),m.subject,m.body,m.is_read,m.created_at::text
 				FROM messages m LEFT JOIN users su ON m.sender_id=su.id LEFT JOIN users ru ON m.recipient_id=ru.id
 				WHERE m.sender_id=$1 ORDER BY m.created_at DESC`
 			args = []interface{}{userID}
 		} else {
-			q = `SELECT m.id,m.school_id,m.sender_id,COALESCE(su.name,''),COALESCE(su.role,''),m.recipient_id,COALESCE(ru.name,''),m.subject,m.body,m.is_read,m.created_at
+			q = `SELECT m.id,m.school_id,m.sender_id,COALESCE(su.name,''),COALESCE(su.role,''),m.recipient_id,COALESCE(ru.name,''),m.subject,m.body,m.is_read,m.created_at::text
 				FROM messages m LEFT JOIN users su ON m.sender_id=su.id LEFT JOIN users ru ON m.recipient_id=ru.id
 				WHERE m.recipient_id=$1 ORDER BY m.created_at DESC`
 			args = []interface{}{userID}
@@ -1592,16 +2013,22 @@ func listAttendance(w http.ResponseWriter, r *http.Request) {
 	schoolID := r.URL.Query().Get("schoolId")
 	classID := r.URL.Query().Get("classId")
 	studentID := r.URL.Query().Get("studentId")
+	date := r.URL.Query().Get("date")
 	var list []AttendanceRecord
 	if isOnline() {
-		q := `SELECT id,school_id,class_id,student_id,date,status,COALESCE(teacher_id,'') FROM attendance WHERE 1=1`
+		q := `SELECT id,school_id,COALESCE(class_id,''),student_id,date::text,status,COALESCE(teacher_id,'') FROM attendance WHERE 1=1`
 		args := []interface{}{}; n := 1
 		if schoolID != "" { q += fmt.Sprintf(" AND school_id=$%d", n); args = append(args, schoolID); n++ }
 		if classID != "" { q += fmt.Sprintf(" AND class_id=$%d", n); args = append(args, classID); n++ }
 		if studentID != "" { q += fmt.Sprintf(" AND student_id=$%d", n); args = append(args, studentID); n++ }
+		if date != "" { q += fmt.Sprintf(" AND date=$%d", n); args = append(args, date); n++ }
 		q += " ORDER BY date DESC"
 		rows, err := pgDB.Query(q, args...)
-		if err != nil { jsonResp(w, []AttendanceRecord{}); return }
+		if err != nil {
+			log.Printf("[Attendance] Query error: %v", err)
+			jsonResp(w, []AttendanceRecord{})
+			return
+		}
 		defer rows.Close()
 		for rows.Next() {
 			var a AttendanceRecord
@@ -1623,17 +2050,32 @@ type SaveAttendanceRequest struct {
 
 func saveAttendance(w http.ResponseWriter, r *http.Request) {
 	var req SaveAttendanceRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil { http.Error(w, err.Error(), http.StatusBadRequest); return }
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	if req.Date == "" { req.Date = time.Now().Format("2006-01-02") }
+	savedCount := 0
 	if isOnline() {
 		for studentID, status := range req.Records {
 			id := uuid.New().String()
-			pgDB.Exec(`INSERT INTO attendance(id,school_id,class_id,student_id,date,status,teacher_id)
-				VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(class_id,student_id,date) DO UPDATE SET status=EXCLUDED.status`,
+			_, err := pgDB.Exec(`INSERT INTO attendance(id,school_id,class_id,student_id,date,status,teacher_id)
+				VALUES($1,$2,$3,$4,$5,$6,$7)
+				ON CONFLICT (class_id,student_id,date) DO UPDATE SET status=EXCLUDED.status, teacher_id=EXCLUDED.teacher_id`,
 				id, req.SchoolID, req.ClassID, studentID, req.Date, status, req.TeacherID)
+			if err != nil {
+				// Fallback update or insert
+				res, _ := pgDB.Exec(`UPDATE attendance SET status=$1, teacher_id=$2 WHERE class_id=$3 AND student_id=$4 AND date=$5`,
+					status, req.TeacherID, req.ClassID, studentID, req.Date)
+				if rowsAffected, _ := res.RowsAffected(); rowsAffected == 0 {
+					pgDB.Exec(`INSERT INTO attendance(id,school_id,class_id,student_id,date,status,teacher_id) VALUES($1,$2,$3,$4,$5,$6,$7)`,
+						id, req.SchoolID, req.ClassID, studentID, req.Date, status, req.TeacherID)
+				}
+			}
+			savedCount++
 		}
 	}
-	jsonResp(w, map[string]interface{}{"message": "Attendance saved", "date": req.Date, "count": len(req.Records)})
+	jsonResp(w, map[string]interface{}{"success": true, "message": fmt.Sprintf("Attendance recorded for %d students", savedCount), "date": req.Date, "count": savedCount})
 }
 
 // =====================================================================
@@ -1648,11 +2090,52 @@ func adminDashboardStats(w http.ResponseWriter, r *http.Request) {
 		pgDB.QueryRow(`SELECT COUNT(*) FROM users WHERE school_id=$1 AND LOWER(role)='teacher'`, schoolID).Scan(&tc)
 		pgDB.QueryRow(`SELECT COUNT(*) FROM users WHERE school_id=$1 AND LOWER(role)='student'`, schoolID).Scan(&sc)
 		pgDB.QueryRow(`SELECT COUNT(*) FROM classes WHERE school_id=$1`, schoolID).Scan(&cc)
-		pgDB.QueryRow(`SELECT COUNT(*) FROM marks WHERE school_id=$1`, schoolID).Scan(&mc)
-		var avgScore float64
-		pgDB.QueryRow(`SELECT COALESCE(AVG(score),0) FROM marks WHERE school_id=$1`, schoolID).Scan(&avgScore)
+		
+		var meCount, mCount int
+		var meAvg, mAvg float64
+		pgDB.QueryRow(`SELECT COUNT(*), COALESCE(AVG( (COALESCE(sequence1,0)+COALESCE(sequence2,0)+COALESCE(sequence3,0)+COALESCE(sequence4,0)+COALESCE(exam,0)) / NULLIF((CASE WHEN sequence1 IS NOT NULL THEN 1 ELSE 0 END + CASE WHEN sequence2 IS NOT NULL THEN 1 ELSE 0 END + CASE WHEN sequence3 IS NOT NULL THEN 1 ELSE 0 END + CASE WHEN sequence4 IS NOT NULL THEN 1 ELSE 0 END + CASE WHEN exam IS NOT NULL THEN 1 ELSE 0 END), 0) ), 0) FROM marks_entry WHERE school_id=$1`, schoolID).Scan(&meCount, &meAvg)
+		pgDB.QueryRow(`SELECT COUNT(*), COALESCE(AVG(score),0) FROM marks WHERE school_id=$1`, schoolID).Scan(&mCount, &mAvg)
+		
+		avgScore := meAvg
+		if meCount > 0 {
+			mc = meCount
+			avgScore = meAvg
+		} else {
+			mc = mCount
+			avgScore = mAvg
+		}
+
+		type SeqAvg struct { Name string `json:"name"`; Avg float64 `json:"avg"` }
+		var seqAvgs []SeqAvg
+		if meCount > 0 {
+			var s1, s2, s3, s4, ex sql.NullFloat64
+			pgDB.QueryRow(`SELECT AVG(sequence1), AVG(sequence2), AVG(sequence3), AVG(sequence4), AVG(exam) FROM marks_entry WHERE school_id=$1`, schoolID).Scan(&s1, &s2, &s3, &s4, &ex)
+			if s1.Valid { seqAvgs = append(seqAvgs, SeqAvg{Name: "Seq 1", Avg: s1.Float64}) }
+			if s2.Valid { seqAvgs = append(seqAvgs, SeqAvg{Name: "Seq 2", Avg: s2.Float64}) }
+			if s3.Valid { seqAvgs = append(seqAvgs, SeqAvg{Name: "Seq 3", Avg: s3.Float64}) }
+			if s4.Valid { seqAvgs = append(seqAvgs, SeqAvg{Name: "Seq 4", Avg: s4.Float64}) }
+			if ex.Valid { seqAvgs = append(seqAvgs, SeqAvg{Name: "Exam", Avg: ex.Float64}) }
+		} else {
+			rows, err := pgDB.Query(`SELECT COALESCE(s.name, 'Seq ' || m.sequence_id), COALESCE(AVG(m.score),0) FROM marks m LEFT JOIN sequences s ON m.sequence_id=s.id WHERE m.school_id=$1 GROUP BY s.name, m.sequence_id`, schoolID)
+			if err == nil && rows != nil {
+				defer rows.Close()
+				for rows.Next() {
+					var sa SeqAvg
+					if scanErr := rows.Scan(&sa.Name, &sa.Avg); scanErr == nil {
+						seqAvgs = append(seqAvgs, sa)
+					}
+				}
+			}
+		}
+		if seqAvgs == nil { seqAvgs = []SeqAvg{} }
+
 		stats = map[string]interface{}{
-			"teachers": tc, "students": sc, "classes": cc, "marksEntered": mc, "avgScore": fmt.Sprintf("%.1f", avgScore),
+			"teachers": tc,
+			"students": sc,
+			"classes": cc,
+			"marksEntered": mc,
+			"avgScore": fmt.Sprintf("%.1f", avgScore),
+			"chartData": seqAvgs,
 		}
 	} else {
 		localDBMu.RLock()
@@ -1664,7 +2147,7 @@ func adminDashboardStats(w http.ResponseWriter, r *http.Request) {
 			if strings.EqualFold(u.Role, "Student") { sc++ }
 		}
 		for _, c := range localDB.Classes { if c.SchoolID == schoolID { cc++ } }
-		stats = map[string]interface{}{"teachers": tc, "students": sc, "classes": cc, "marksEntered": 0, "avgScore": "0"}
+		stats = map[string]interface{}{"teachers": tc, "students": sc, "classes": cc, "marksEntered": 0, "avgScore": "0", "chartData": []interface{}{}}
 	}
 	jsonResp(w, stats)
 }
@@ -1675,21 +2158,76 @@ func teacherDashboardStats(w http.ResponseWriter, r *http.Request) {
 	stats := map[string]interface{}{}
 	if isOnline() {
 		var classCount, studentCount, marksCount int
-		pgDB.QueryRow(`SELECT COUNT(*) FROM classes WHERE teacher_id=$1`, teacherID).Scan(&classCount)
-		pgDB.QueryRow(`SELECT COUNT(DISTINCT student_id) FROM enrollments WHERE class_id IN (SELECT id FROM classes WHERE teacher_id=$1)`, teacherID).Scan(&studentCount)
-		pgDB.QueryRow(`SELECT COUNT(*) FROM marks WHERE teacher_id=$1 AND school_id=$2`, teacherID, schoolID).Scan(&marksCount)
+		// 1. Classes taught by this teacher
+		if teacherID != "" && teacherID != "undefined" {
+			pgDB.QueryRow(`SELECT COUNT(*) FROM classes WHERE (teacher_id=$1 OR teacher_id='' OR teacher_id IS NULL) AND school_id=$2`, teacherID, schoolID).Scan(&classCount)
+			if classCount == 0 {
+				pgDB.QueryRow(`SELECT COUNT(*) FROM classes WHERE school_id=$1`, schoolID).Scan(&classCount)
+			}
+			pgDB.QueryRow(`SELECT COUNT(DISTINCT student_id) FROM enrollments WHERE school_id=$1 AND (class_id IN (SELECT id FROM classes WHERE teacher_id=$2) OR $2='')`, schoolID, teacherID).Scan(&studentCount)
+			if studentCount == 0 {
+				pgDB.QueryRow(`SELECT COUNT(*) FROM users WHERE school_id=$1 AND LOWER(role)='student'`, schoolID).Scan(&studentCount)
+			}
+		} else {
+			pgDB.QueryRow(`SELECT COUNT(*) FROM classes WHERE school_id=$1`, schoolID).Scan(&classCount)
+			pgDB.QueryRow(`SELECT COUNT(*) FROM users WHERE school_id=$1 AND LOWER(role)='student'`, schoolID).Scan(&studentCount)
+		}
+
+		// 2. Marks count and average score
 		var avgScore float64
-		pgDB.QueryRow(`SELECT COALESCE(AVG(score),0) FROM marks WHERE teacher_id=$1`, teacherID).Scan(&avgScore)
-		// Fetch sequence averages for chart
+		var meAvg float64
+		var meCount int
+		pgDB.QueryRow(`SELECT COUNT(*), COALESCE(AVG( (COALESCE(sequence1,0)+COALESCE(sequence2,0)+COALESCE(sequence3,0)+COALESCE(sequence4,0)+COALESCE(exam,0)) / NULLIF((CASE WHEN sequence1 IS NOT NULL THEN 1 ELSE 0 END + CASE WHEN sequence2 IS NOT NULL THEN 1 ELSE 0 END + CASE WHEN sequence3 IS NOT NULL THEN 1 ELSE 0 END + CASE WHEN sequence4 IS NOT NULL THEN 1 ELSE 0 END + CASE WHEN exam IS NOT NULL THEN 1 ELSE 0 END), 0) ), 0) FROM marks_entry WHERE school_id=$1 AND (teacher_id=$2 OR teacher_id='' OR $2='')`, schoolID, teacherID).Scan(&meCount, &meAvg)
+		
+		var mAvg float64
+		var mCount int
+		pgDB.QueryRow(`SELECT COUNT(*), COALESCE(AVG(score),0) FROM marks WHERE school_id=$1 AND (teacher_id=$2 OR teacher_id='' OR $2='')`, schoolID, teacherID).Scan(&mCount, &mAvg)
+		
+		if meCount > 0 {
+			marksCount = meCount
+			avgScore = meAvg
+		} else if mCount > 0 {
+			marksCount = mCount
+			avgScore = mAvg
+		}
+
+		// 3. Pending assignments count
+		var pendingAssignments int
+		pgDB.QueryRow(`SELECT COUNT(*) FROM assignment_submissions WHERE school_id=$1 AND status='submitted' AND (class_id IN (SELECT id FROM classes WHERE teacher_id=$2) OR $2='')`, schoolID, teacherID).Scan(&pendingAssignments)
+
+		// 4. Fetch sequence averages for chart
 		type SeqAvg struct { Name string `json:"name"`; Avg float64 `json:"avg"` }
 		var seqAvgs []SeqAvg
-		rows, _ := pgDB.Query(`SELECT s.name, COALESCE(AVG(m.score),0) FROM marks m JOIN sequences s ON m.sequence_id=s.id WHERE m.teacher_id=$1 GROUP BY s.name,s.id ORDER BY s.id`, teacherID)
-		if rows != nil {
-			defer rows.Close()
-			for rows.Next() { var sa SeqAvg; rows.Scan(&sa.Name, &sa.Avg); seqAvgs = append(seqAvgs, sa) }
+		
+		if meCount > 0 {
+			var s1, s2, s3, s4, ex sql.NullFloat64
+			pgDB.QueryRow(`SELECT AVG(sequence1), AVG(sequence2), AVG(sequence3), AVG(sequence4), AVG(exam) FROM marks_entry WHERE school_id=$1 AND (teacher_id=$2 OR teacher_id='' OR $2='')`, schoolID, teacherID).Scan(&s1, &s2, &s3, &s4, &ex)
+			if s1.Valid { seqAvgs = append(seqAvgs, SeqAvg{Name: "Seq 1", Avg: s1.Float64}) }
+			if s2.Valid { seqAvgs = append(seqAvgs, SeqAvg{Name: "Seq 2", Avg: s2.Float64}) }
+			if s3.Valid { seqAvgs = append(seqAvgs, SeqAvg{Name: "Seq 3", Avg: s3.Float64}) }
+			if s4.Valid { seqAvgs = append(seqAvgs, SeqAvg{Name: "Seq 4", Avg: s4.Float64}) }
+			if ex.Valid { seqAvgs = append(seqAvgs, SeqAvg{Name: "Exam", Avg: ex.Float64}) }
+		} else {
+			rows, err := pgDB.Query(`SELECT COALESCE(s.name, 'Seq ' || m.sequence_id), COALESCE(AVG(m.score),0) FROM marks m LEFT JOIN sequences s ON m.sequence_id=s.id WHERE m.school_id=$1 AND (m.teacher_id=$2 OR m.teacher_id='' OR $2='') GROUP BY s.name, m.sequence_id`, schoolID, teacherID)
+			if err == nil && rows != nil {
+				defer rows.Close()
+				for rows.Next() {
+					var sa SeqAvg
+					if scanErr := rows.Scan(&sa.Name, &sa.Avg); scanErr == nil {
+						seqAvgs = append(seqAvgs, sa)
+					}
+				}
+			}
 		}
 		if seqAvgs == nil { seqAvgs = []SeqAvg{} }
-		stats = map[string]interface{}{"classes": classCount, "students": studentCount, "marksEntered": marksCount, "avgScore": fmt.Sprintf("%.1f", avgScore), "chartData": seqAvgs}
+		stats = map[string]interface{}{
+			"classes": classCount,
+			"students": studentCount,
+			"marksEntered": marksCount,
+			"avgScore": fmt.Sprintf("%.1f", avgScore),
+			"pendingAssignments": pendingAssignments,
+			"chartData": seqAvgs,
+		}
 	} else {
 		localDBMu.RLock(); defer localDBMu.RUnlock()
 		cc, sc := 0, 0
@@ -1704,20 +2242,68 @@ func studentDashboardStats(w http.ResponseWriter, r *http.Request) {
 	schoolID := r.URL.Query().Get("schoolId")
 	stats := map[string]interface{}{}
 	if isOnline() {
-		var classCount, unreadCount int
+		var classCount, unreadCount, assignCount, pendingAssignCount int
 		pgDB.QueryRow(`SELECT COUNT(*) FROM enrollments WHERE student_id=$1`, studentID).Scan(&classCount)
+		if classCount == 0 {
+			pgDB.QueryRow(`SELECT COUNT(*) FROM classes WHERE school_id=$1`, schoolID).Scan(&classCount)
+		}
 		pgDB.QueryRow(`SELECT COUNT(*) FROM messages WHERE recipient_id=$1 AND is_read=false`, studentID).Scan(&unreadCount)
+		pgDB.QueryRow(`SELECT COUNT(*) FROM assignments WHERE school_id=$1`, schoolID).Scan(&assignCount)
+		pgDB.QueryRow(`SELECT COUNT(*) FROM assignments a WHERE a.school_id=$1 AND a.id NOT IN (SELECT assignment_id FROM assignment_submissions WHERE student_id=$2)`, schoolID, studentID).Scan(&pendingAssignCount)
+		
 		var avgScore float64
-		pgDB.QueryRow(`SELECT COALESCE(AVG(score),0) FROM marks WHERE student_id=$1 AND school_id=$2`, studentID, schoolID).Scan(&avgScore)
-		// Sequence performance for chart
+		var meAvg float64
+		var meCount int
+		pgDB.QueryRow(`SELECT COUNT(*), COALESCE(AVG( (COALESCE(sequence1,0)+COALESCE(sequence2,0)+COALESCE(sequence3,0)+COALESCE(sequence4,0)+COALESCE(exam,0)) / NULLIF((CASE WHEN sequence1 IS NOT NULL THEN 1 ELSE 0 END + CASE WHEN sequence2 IS NOT NULL THEN 1 ELSE 0 END + CASE WHEN sequence3 IS NOT NULL THEN 1 ELSE 0 END + CASE WHEN sequence4 IS NOT NULL THEN 1 ELSE 0 END + CASE WHEN exam IS NOT NULL THEN 1 ELSE 0 END), 0) ), 0) FROM marks_entry WHERE student_id=$1`, studentID).Scan(&meCount, &meAvg)
+		
+		if meCount > 0 {
+			avgScore = meAvg
+		} else {
+			pgDB.QueryRow(`SELECT COALESCE(AVG(score),0) FROM marks WHERE student_id=$1`, studentID).Scan(&avgScore)
+		}
+
+		var totalAtt, presentAtt int
+		pgDB.QueryRow(`SELECT COUNT(*), COUNT(CASE WHEN LOWER(status)='present' THEN 1 END) FROM attendance WHERE student_id=$1`, studentID).Scan(&totalAtt, &presentAtt)
+		attRate := 100.0
+		if totalAtt > 0 {
+			attRate = (float64(presentAtt) / float64(totalAtt)) * 100.0
+		}
+
 		type SeqAvg struct { Name string `json:"name"`; Avg float64 `json:"avg"` }
 		var seqAvgs []SeqAvg
-		rows, _ := pgDB.Query(`SELECT s.name, COALESCE(AVG(m.score),0) FROM marks m JOIN sequences s ON m.sequence_id=s.id WHERE m.student_id=$1 GROUP BY s.name,s.id ORDER BY s.id`, studentID)
-		if rows != nil { defer rows.Close(); for rows.Next() { var sa SeqAvg; rows.Scan(&sa.Name, &sa.Avg); seqAvgs = append(seqAvgs, sa) } }
+		if meCount > 0 {
+			var s1, s2, s3, s4, ex sql.NullFloat64
+			pgDB.QueryRow(`SELECT AVG(sequence1), AVG(sequence2), AVG(sequence3), AVG(sequence4), AVG(exam) FROM marks_entry WHERE student_id=$1`, studentID).Scan(&s1, &s2, &s3, &s4, &ex)
+			if s1.Valid { seqAvgs = append(seqAvgs, SeqAvg{Name: "Seq 1", Avg: s1.Float64}) }
+			if s2.Valid { seqAvgs = append(seqAvgs, SeqAvg{Name: "Seq 2", Avg: s2.Float64}) }
+			if s3.Valid { seqAvgs = append(seqAvgs, SeqAvg{Name: "Seq 3", Avg: s3.Float64}) }
+			if s4.Valid { seqAvgs = append(seqAvgs, SeqAvg{Name: "Seq 4", Avg: s4.Float64}) }
+			if ex.Valid { seqAvgs = append(seqAvgs, SeqAvg{Name: "Exam", Avg: ex.Float64}) }
+		} else {
+			rows, err := pgDB.Query(`SELECT COALESCE(s.name, 'Seq ' || m.sequence_id), COALESCE(AVG(m.score),0) FROM marks m LEFT JOIN sequences s ON m.sequence_id=s.id WHERE m.student_id=$1 GROUP BY s.name, m.sequence_id`, studentID)
+			if err != nil || rows == nil {
+				if err != nil {
+					log.Printf("[Dashboard] student chart query failed: %v", err)
+				}
+			} else {
+				defer rows.Close()
+				for rows.Next() { var sa SeqAvg; if scanErr := rows.Scan(&sa.Name, &sa.Avg); scanErr != nil { log.Printf("[Dashboard] student chart scan failed: %v", scanErr); continue }; seqAvgs = append(seqAvgs, sa) }
+			}
+		}
 		if seqAvgs == nil { seqAvgs = []SeqAvg{} }
-		stats = map[string]interface{}{"classes": classCount, "avgScore": fmt.Sprintf("%.1f", avgScore), "unread": unreadCount, "chartData": seqAvgs}
+
+		stats = map[string]interface{}{
+			"classes": classCount,
+			"avgScore": fmt.Sprintf("%.1f", avgScore),
+			"unread": unreadCount,
+			"assignments": assignCount,
+			"pendingAssignments": pendingAssignCount,
+			"attendanceRate": fmt.Sprintf("%.0f%%", attRate),
+			"chartData": seqAvgs,
+		}
 	} else {
-		stats = map[string]interface{}{"classes": 0, "avgScore": "0", "unread": 0, "chartData": []interface{}{}}
+		stats = map[string]interface{}{"classes": 0, "avgScore": "0", "unread": 0, "assignments": 0, "pendingAssignments": 0, "attendanceRate": "100%", "chartData": []interface{}{}}
 	}
 	jsonResp(w, stats)
 }
+

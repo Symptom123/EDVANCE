@@ -84,16 +84,3 @@ export const badge = (bg, fg) => ({
   fontSize: 11,
   fontWeight: 600,
 });
-
-export const navItemStyle = (active, accent) => ({
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  width: "100%",
-  padding: "8px 12px",
-  borderRadius: 6,
-  background: active ? rgba(accent, 0.15) : "transparent",
-  color: active ? accent : "inherit",
-  fontFamily: T.fontSans,
-  cursor: "pointer",
-});

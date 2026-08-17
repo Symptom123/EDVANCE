@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ClipboardCheck, GraduationCap, FileText, UserPlus, Megaphone, User, LogOut, Plus, Loader2, CheckCircle2, X, Mail, Trash2, Download, BookOpen, Users } from 'lucide-react';
+import { LayoutDashboard, ClipboardCheck, GraduationCap, FileText, UserPlus, Megaphone, User, LogOut, Plus, Loader2, CheckCircle2, X, Mail, Trash2, Download, BookOpen, Users, Menu, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { T, rgba, navItemStyle, cardStyle, inputStyle, btnStyle, badge } from '../styles/portalTheme';
 import * as XLSX from 'xlsx';
+import TeacherMarkEntryForm from '../components/TeacherMarkEntryForm';
 
 export default function TeacherPortal() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [config, setConfig] = useState(null);
 
   // Common data
@@ -24,9 +27,10 @@ export default function TeacherPortal() {
   const [newClassSubject, setNewClassSubject] = useState('');
   const [newClassYear, setNewClassYear] = useState('');
   const [createClassLoading, setCreateClassLoading] = useState(false);
+  const [classSuccess, setClassSuccess] = useState('');
   
   // Dashboard
-  const [dashData, setDashData] = useState({ classes: 0, students: 0, avgScore: 0, chartData: [] });
+  const [dashData, setDashData] = useState({ classes: 0, students: 0, avgScore: 0, pendingAssignments: 0, chartData: [] });
   const [dashLoading, setDashLoading] = useState(true);
 
   // Attendance
@@ -35,6 +39,7 @@ export default function TeacherPortal() {
   const [attStudents, setAttStudents] = useState([]);
   const [attendance, setAttendance] = useState({});
   const [attLoading, setAttLoading] = useState(false);
+  const [attSuccess, setAttSuccess] = useState('');
 
   // Grading
   const [gradingClassId, setGradingClassId] = useState('');
@@ -49,7 +54,13 @@ export default function TeacherPortal() {
   const [assignments, setAssignments] = useState([]);
   const [assignLoading, setAssignLoading] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [newAssign, setNewAssign] = useState({ title: '', description: '', dueDate: '' });
+  const [newAssign, setNewAssign] = useState({ title: '', description: '', dueDate: '', maxPoints: 20 });
+  const [selectedAssignForGrading, setSelectedAssignForGrading] = useState(null);
+  const [submissions, setSubmissions] = useState([]);
+  const [submissionsLoading, setSubmissionsLoading] = useState(false);
+  const [gradingModalData, setGradingModalData] = useState(null);
+  const [saveGradeLoading, setSaveGradeLoading] = useState(false);
+  const [assignSuccess, setAssignSuccess] = useState('');
 
   // Announcements
   const [announcements, setAnnouncements] = useState([]);
@@ -75,6 +86,7 @@ export default function TeacherPortal() {
   }, [navigate]);
 
   useEffect(() => {
+    if (!config) return;
     const tid = config.id || config.userId || '';
     const sid = config.schoolId || '';
     
@@ -146,20 +158,27 @@ export default function TeacherPortal() {
   }, [config, activeTab, attClassId, attDate]);
 
   const handleSaveAttendance = () => {
+    setAttSuccess('');
+    const tid = config.id || config.userId || '';
     fetch(`http://localhost:8080/api/attendance`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         schoolId: config.schoolId,
         classId: attClassId,
-        teacherId: config.id,
+        teacherId: tid,
         date: attDate,
         records: attendance
       })
-    }).then(r => {
-      if (r.ok) alert('Attendance saved successfully');
-      else alert('Failed to save attendance');
-    });
+    }).then(async r => {
+      if (r.ok) {
+        setAttSuccess(`Attendance saved successfully for ${Object.keys(attendance).length} students!`);
+        setTimeout(() => setAttSuccess(''), 4000);
+      } else {
+        const txt = await r.text();
+        alert('Failed to save attendance: ' + txt);
+      }
+    }).catch(err => alert('Network error: ' + err.message));
   };
 
   // Handle Grading tab
@@ -260,25 +279,63 @@ export default function TeacherPortal() {
 
   const handleCreateAssignment = (e) => {
     e.preventDefault();
+    const tid = config.id || config.userId || '';
     fetch(`http://localhost:8080/api/assignments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         schoolId: config.schoolId,
         classId: assignClassId,
-        teacherId: config.id,
+        teacherId: tid,
         teacherName: config.name,
         title: newAssign.title,
         description: newAssign.description,
-        dueDate: newAssign.dueDate
+        dueDate: newAssign.dueDate,
+        maxPoints: Number(newAssign.maxPoints) || 20
       })
     }).then(r => {
       if (r.ok) {
         setShowAssignModal(false);
-        setNewAssign({ title: '', description: '', dueDate: '' });
+        setNewAssign({ title: '', description: '', dueDate: '', maxPoints: 20 });
+        setAssignSuccess('Assignment created and dispatched to students!');
+        setTimeout(() => setAssignSuccess(''), 4000);
         fetchAssignments();
       }
     });
+  };
+
+  const handleOpenSubmissions = (assign) => {
+    setSelectedAssignForGrading(assign);
+    setSubmissionsLoading(true);
+    setAssignSuccess('');
+    fetch(`http://localhost:8080/api/assignments/${assign.id || assign.ID}/submissions`)
+      .then(r => r.json())
+      .then(d => {
+        setSubmissions(Array.isArray(d) ? d : []);
+        setSubmissionsLoading(false);
+      })
+      .catch(() => setSubmissionsLoading(false));
+  };
+
+  const handleSaveGrade = (submissionId, gradeVal, feedbackVal) => {
+    setSaveGradeLoading(true);
+    fetch(`http://localhost:8080/api/assignments/submissions/${submissionId}/grade`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        grade: parseFloat(gradeVal),
+        feedback: feedbackVal
+      })
+    })
+      .then(r => r.json())
+      .then(() => {
+        setSubmissions(prev => prev.map(s => s.id === submissionId ? { ...s, grade: parseFloat(gradeVal), feedback: feedbackVal, status: 'graded' } : s));
+        setGradingModalData(null);
+        setAssignSuccess('Grade and feedback saved successfully!');
+        setTimeout(() => setAssignSuccess(''), 3000);
+      })
+      .catch(err => alert('Error saving grade: ' + err.message))
+      .finally(() => setSaveGradeLoading(false));
   };
 
   // Handle Announcements tab
@@ -359,7 +416,13 @@ export default function TeacherPortal() {
     });
   };
 
-  if (!config) return null;
+  if (!config) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, background: '#f5f4f0' }}>
+      <div style={{ width: 40, height: 40, border: '4px solid #e5e7eb', borderTopColor: '#10b981', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }}/>
+      <p style={{ color: '#9ca3af', fontSize: 14, fontFamily: 'system-ui' }}>Loading your portal...</p>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
   const accent = config.primaryColor || '#2563eb';
   const name = config.name || 'Teacher';
 
@@ -375,36 +438,60 @@ export default function TeacherPortal() {
   ];
 
   const renderDashboard = () => {
-    let maxAvg = Math.max(...(dashData.chartData || []).map(d => d.avg || 0), 1);
+    let maxAvg = Math.max(...(dashData.chartData || []).map(d => d.avg || 0), 20);
     
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
         <div>
           <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 8px' }}>Teacher Dashboard</p>
           <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 38, fontWeight: 400, margin: 0, color: T.text }}>Good morning, {name} 👋</h1>
-          <p style={{ color: T.muted, margin: '8px 0 0', fontSize: 15 }}>Here's your class overview for today.</p>
+          <p style={{ color: T.muted, margin: '8px 0 0', fontSize: 15 }}>Here's your accurate academic and classroom overview for today.</p>
         </div>
         
-        {dashLoading ? <div style={{ display: 'flex', gap: 8, color: T.muted }}><Loader2 size={16} className="spin" /> Loading...</div> : (
+        {dashLoading ? <div style={{ display: 'flex', gap: 8, color: T.muted }}><Loader2 size={16} className="spin" /> Loading stats...</div> : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-              {[{ label: 'Total Students', value: dashData.students || 0, color: accent }, 
-                { label: 'Total Classes', value: dashData.classes || 0, color: '#059669' }, 
-                { label: 'Avg Class Score', value: `${(dashData.avgScore || 0).toFixed(1)}%`, color: '#d97706' }
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+              {[
+                { label: 'Total Students', value: dashData.students || 0, color: accent, icon: Users }, 
+                { label: 'Total Classes', value: dashData.classes || myClasses.length, color: '#059669', icon: BookOpen }, 
+                { label: 'Avg Class Score', value: `${Number(dashData.avgScore || 0).toFixed(1)}/20`, color: '#d97706', icon: GraduationCap },
+                { label: 'Pending Submissions', value: dashData.pendingAssignments || 0, color: '#dc2626', icon: FileText }
               ].map(s => (
-                <div key={s.label} style={{ ...cardStyle, borderTop: `3px solid ${s.color}` }}>
-                  <p style={{ color: T.muted, fontSize: 13, fontWeight: 500, margin: '0 0 10px' }}>{s.label}</p>
-                  <p style={{ fontFamily: T.fontSerif, fontSize: 42, margin: 0, color: T.text, lineHeight: 1 }}>{s.value}</p>
+                <div key={s.label} style={{ ...cardStyle, borderTop: `3px solid ${s.color}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <p style={{ color: T.muted, fontSize: 13, fontWeight: 600, margin: 0 }}>{s.label}</p>
+                    <s.icon size={18} style={{ color: s.color, opacity: 0.8 }} />
+                  </div>
+                  <p style={{ fontFamily: T.fontSerif, fontSize: 36, margin: 0, color: T.text, lineHeight: 1 }}>{s.value}</p>
                 </div>
               ))}
             </div>
 
+            {/* Quick Actions Bar */}
+            <div style={{ ...cardStyle, padding: 18, background: '#faf9f7', border: `1px solid ${T.border}` }}>
+              <p style={{ margin: '0 0 12px', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: T.light }}>Quick Actions</p>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <button onClick={() => { setActiveTab('classes'); setShowCreateClassModal(true); }} style={{ ...btnStyle(accent), fontSize: 13, padding: '8px 14px' }}>
+                  <Plus size={14} /> Create New Class
+                </button>
+                <button onClick={() => setActiveTab('attendance')} style={{ ...btnStyle(accent, true), fontSize: 13, padding: '8px 14px' }}>
+                  <ClipboardCheck size={14} /> Take Daily Attendance
+                </button>
+                <button onClick={() => setActiveTab('grading')} style={{ ...btnStyle(accent, true), fontSize: 13, padding: '8px 14px' }}>
+                  <GraduationCap size={14} /> Enter Multi-Sequence Marks
+                </button>
+                <button onClick={() => { setActiveTab('assignments'); setShowAssignModal(true); }} style={{ ...btnStyle(accent, true), fontSize: 13, padding: '8px 14px' }}>
+                  <FileText size={14} /> Post Assignment
+                </button>
+              </div>
+            </div>
+
             <div style={cardStyle}>
               <p style={{ fontFamily: T.fontSans, fontWeight: 600, color: T.text, margin: '0 0 4px', fontSize: 15 }}>Class Performance Over Time</p>
-              <p style={{ color: T.muted, fontSize: 13, margin: '0 0 20px' }}>Average score per sequence</p>
+              <p style={{ color: T.muted, fontSize: 13, margin: '0 0 20px' }}>Average score per sequence / term</p>
               
               {(!dashData.chartData || dashData.chartData.length === 0) ? (
-                <div style={{ padding: '40px 0', textAlign: 'center', color: T.muted }}>No grade data yet</div>
+                <div style={{ padding: '40px 0', textAlign: 'center', color: T.muted, fontStyle: 'italic' }}>No marks entered yet to plot performance curve.</div>
               ) : (
                 <svg viewBox="0 0 700 160" style={{ width: '100%', display: 'block' }}>
                   <defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={accent} stopOpacity="0.15" /><stop offset="100%" stopColor={accent} stopOpacity="0" /></linearGradient></defs>
@@ -431,7 +518,7 @@ export default function TeacherPortal() {
               )}
               {dashData.chartData && dashData.chartData.length > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-                  {dashData.chartData.map((d, i) => <span key={i} style={{ color: T.light, fontSize: 11, fontWeight: 500 }}>{d.name}</span>)}
+                  {dashData.chartData.map((d, i) => <span key={i} style={{ color: T.light, fontSize: 11, fontWeight: 500 }}>{d.name} ({Number(d.avg || 0).toFixed(1)})</span>)}
                 </div>
               )}
             </div>
@@ -443,11 +530,20 @@ export default function TeacherPortal() {
 
   const renderAttendanceView = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div><p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Daily Record</p><h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Take Attendance</h1></div>
+      <div>
+        <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Daily Record</p>
+        <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Take Attendance</h1>
+      </div>
+
+      {attSuccess && (
+        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d', padding: '12px 16px', borderRadius: 8, fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <CheckCircle2 size={16} /> {attSuccess}
+        </div>
+      )}
       
-      <div style={{ ...cardStyle, maxWidth: 600 }}>
-        <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
-          <div style={{ flex: 1 }}>
+      <div style={{ ...cardStyle, maxWidth: 680 }}>
+        <div style={{ display: 'flex', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 200 }}>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Select Class</label>
             <select value={attClassId} onChange={e => setAttClassId(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
               {myClasses.map(c => <option key={c.id || c.ID} value={c.id || c.ID}>{c.name}</option>)}
@@ -459,26 +555,73 @@ export default function TeacherPortal() {
           </div>
         </div>
 
-        {attLoading ? <div style={{ color: T.muted }}>Loading students...</div> : 
-         attStudents.length === 0 ? <div style={{ color: T.muted }}>No students enrolled in this class.</div> : (
+        {/* Quick bulk action buttons */}
+        {attStudents.length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${T.borderLight}`, marginBottom: 10 }}>
+            <span style={{ fontSize: 13, color: T.muted, fontWeight: 600 }}>{attStudents.length} Students in Roster</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => {
+                  const allP = {};
+                  attStudents.forEach(s => allP[s.studentId] = 'present');
+                  setAttendance(allP);
+                }}
+                style={{ ...btnStyle(accent, true), padding: '4px 10px', fontSize: 11 }}
+              >
+                Mark All Present
+              </button>
+              <button
+                onClick={() => {
+                  const allA = {};
+                  attStudents.forEach(s => allA[s.studentId] = 'absent');
+                  setAttendance(allA);
+                }}
+                style={{ ...btnStyle('#ef4444', true), padding: '4px 10px', fontSize: 11 }}
+              >
+                Mark All Absent
+              </button>
+            </div>
+          </div>
+        )}
+
+        {attLoading ? <div style={{ color: T.muted, padding: '20px 0' }}><Loader2 size={16} className="spin" /> Loading students...</div> : 
+         attStudents.length === 0 ? (
+          <div style={{ padding: '30px 0', textAlign: 'center' }}>
+            <p style={{ color: T.muted, fontSize: 14, margin: '0 0 12px' }}>No students enrolled in this class roster yet.</p>
+            <button onClick={() => {
+              const cls = myClasses.find(c => (c.id || c.ID) === attClassId);
+              if (cls) handleFetchClassRoster(cls);
+              setActiveTab('classes');
+            }} style={btnStyle(accent)}>
+              <Users size={14} /> Open Roster & Enroll Students
+            </button>
+          </div>
+        ) : (
           <>
-            {attStudents.map((s) => (
-              <div key={s.studentId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: `1px solid ${T.borderLight}` }}>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: rgba(accent, 0.1), display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.fontSerif, fontStyle: 'italic', color: accent }}>{(s.studentName || '?').charAt(0)}</div>
-                  <strong style={{ fontSize: 14, color: T.text }}>{s.studentName}</strong>
+            <div style={{ display: 'flex', flexDirection: 'column', divideY: `1px solid ${T.borderLight}` }}>
+              {attStudents.map((s) => (
+                <div key={s.studentId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: `1px solid ${T.borderLight}` }}>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: rgba(accent, 0.1), display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.fontSerif, fontStyle: 'italic', color: accent }}>{(s.studentName || '?').charAt(0)}</div>
+                    <div>
+                      <strong style={{ fontSize: 14, color: T.text, display: 'block' }}>{s.studentName}</strong>
+                      <span style={{ fontSize: 11, color: T.light }}>ID: {s.studentId}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {['present', 'absent', 'late'].map(st => (
+                      <button key={st} onClick={() => setAttendance(a => ({ ...a, [s.studentId]: st }))}
+                        style={{ padding: '6px 14px', borderRadius: 100, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: T.fontSans, background: attendance[s.studentId] === st ? (st === 'present' ? '#dcfce7' : st === 'absent' ? '#fee2e2' : '#fef9c3') : T.borderLight, color: attendance[s.studentId] === st ? (st === 'present' ? '#15803d' : st === 'absent' ? '#dc2626' : '#d97706') : T.muted, transition: 'all 0.15s', textTransform: 'capitalize' }}>
+                        {st}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {['present', 'absent', 'late'].map(st => (
-                    <button key={st} onClick={() => setAttendance(a => ({ ...a, [s.studentId]: st }))}
-                      style={{ padding: '6px 14px', borderRadius: 100, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: T.fontSans, background: attendance[s.studentId] === st ? (st === 'present' ? '#dcfce7' : st === 'absent' ? '#fee2e2' : '#fef9c3') : T.borderLight, color: attendance[s.studentId] === st ? (st === 'present' ? '#15803d' : st === 'absent' ? '#dc2626' : '#d97706') : T.muted, transition: 'all 0.15s', textTransform: 'capitalize' }}>
-                      {st}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-            <button onClick={handleSaveAttendance} style={{ ...btnStyle(accent), marginTop: 20 }}><CheckCircle2 size={15} />Save Attendance</button>
+              ))}
+            </div>
+            <button onClick={handleSaveAttendance} style={{ ...btnStyle(accent), marginTop: 20, width: '100%', justifyContent: 'center', padding: '12px' }}>
+              <CheckCircle2 size={16} /> Save Attendance Record
+            </button>
           </>
         )}
       </div>
@@ -486,125 +629,223 @@ export default function TeacherPortal() {
   );
 
   const renderGrading = () => {
-    const seq = sequences.find(s => (s.id || s.ID) === gradingSequenceId);
-    const isLocked = seq && seq.isLocked;
-    
     return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div><p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Assessment</p><h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Mark Entry</h1></div>
-      
-      <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {isLocked && <div style={{ background: '#fee2e2', color: '#ef4444', padding: '12px 16px', borderRadius: 8, fontWeight: 600 }}>⚠️ This sequence is locked by the Admin. Marks cannot be edited.</div>}
-        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Select Class</label>
-            <select value={gradingClassId} onChange={e => setGradingClassId(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
-              <option value="">-- Choose Class --</option>
-              {myClasses.map(c => <option key={c.ID || c.id} value={c.ID || c.id}>{c.name} {c.subject ? `(${c.subject})` : ''}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Sequence</label>
-            <select value={gradingSequenceId} onChange={e => setGradingSequenceId(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
-              <option value="">-- Choose Sequence --</option>
-              {sequences.map(s => <option key={s.id || s.ID} value={s.id || s.ID}>{s.name}</option>)}
-              {!sequences.length && <option value="" disabled>No sequences found</option>}
-            </select>
-          </div>
-        </div>
-        
-        <div style={{ borderTop: `1px solid ${T.borderLight}`, paddingTop: 16, display: 'flex', gap: 10, alignItems: 'center' }}>
-          <button onClick={handleExcelTemplateDownload} style={{ ...btnStyle('#10b981'), background: 'transparent', color: '#10b981', border: '1px solid #10b981' }}>
-             Download Mark Sheet
-          </button>
-          
-          <label style={{ ...btnStyle(isLocked ? '#ccc' : '#10b981'), cursor: isLocked ? 'not-allowed' : 'pointer', margin: 0, display: 'flex', alignItems: 'center', gap: 6, pointerEvents: isLocked ? 'none' : 'auto' }}>
-             Upload Excel Marks
-            <input type="file" accept=".xlsx, .xls" style={{ display: 'none' }} onChange={handleExcelUpload} disabled={isLocked} />
-          </label>
-        </div>
-      </div>
-
-      {gradingClassId && gradingSequenceId && (
-        <div style={{ ...cardStyle }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: 16, color: T.text }}>Student Marks</h3>
-          {gradLoading ? <div style={{ color: T.muted }}>Loading...</div> : gradStudents.length === 0 ? <div style={{ color: T.muted }}>No students enrolled.</div> : (
-            <div>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, paddingBottom: 10, borderBottom: `1px solid ${T.borderLight}`, fontWeight: 600, color: T.muted, fontSize: 13 }}>
-                <span>Student Name</span>
-                <span>Score</span>
-              </div>
-              {gradStudents.map(s => (
-                <div key={s.studentId} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, padding: '12px 0', borderBottom: `1px solid ${T.borderLight}`, alignItems: 'center' }}>
-                  <strong style={{ fontSize: 14, color: T.text }}>{s.studentName}</strong>
-                  <input type="number" min="0" max="100" value={marks[s.studentId] !== undefined ? marks[s.studentId] : ''} onChange={e => setMarks(m => ({ ...m, [s.studentId]: e.target.value }))} disabled={isLocked} style={{ ...inputStyle, width: 100 }} placeholder="0-100" />
-                </div>
-              ))}
-              <div style={{ marginTop: 20 }}>
-                <button onClick={handleSaveMarks} disabled={isLocked} style={btnStyle(isLocked ? '#ccc' : accent)}><CheckCircle2 size={15} /> Save All Marks</button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )};
+      <TeacherMarkEntryForm config={config} myClasses={myClasses} accent={accent} />
+    );
+  };
 
   const renderAssignments = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div><p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Tasks</p><h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Assignments</h1></div>
-        <button onClick={() => setShowAssignModal(true)} style={btnStyle(accent)}><Plus size={15} />Create Assignment</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Coursework & Grading</p>
+          <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Assignments & Submissions</h1>
+        </div>
+        <button onClick={() => setShowAssignModal(true)} style={btnStyle(accent)}>
+          <Plus size={15} /> Create Assignment
+        </button>
       </div>
+
+      {assignSuccess && (
+        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d', padding: '12px 16px', borderRadius: 8, fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <CheckCircle2 size={16} /> {assignSuccess}
+        </div>
+      )}
       
-      <div style={{ marginBottom: 16, maxWidth: 400 }}>
+      <div style={{ maxWidth: 400 }}>
         <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Filter by Class</label>
         <select value={assignClassId} onChange={e => setAssignClassId(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
           {myClasses.map(c => <option key={c.id || c.ID} value={c.id || c.ID}>{c.name}</option>)}
         </select>
       </div>
 
-      {assignLoading ? <div style={{ color: T.muted }}>Loading...</div> : assignments.length === 0 ? <div style={{ color: T.muted }}>No assignments for this class.</div> : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      {assignLoading ? <div style={{ color: T.muted }}><Loader2 size={16} className="spin" /> Loading assignments...</div> : assignments.length === 0 ? (
+        <div style={{ ...cardStyle, textAlign: 'center', padding: '50px 20px' }}>
+          <FileText size={36} style={{ color: T.light, marginBottom: 12 }} />
+          <h3 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 6px', color: T.text }}>No Assignments for this Class</h3>
+          <p style={{ color: T.muted, fontSize: 14, margin: '0 0 16px' }}>Create an assignment to assign coursework, review submitted work, and return grades to your students.</p>
+          <button onClick={() => setShowAssignModal(true)} style={btnStyle(accent)}>
+            <Plus size={15} /> Create First Assignment
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
           {assignments.map((a, i) => (
-            <div key={a.id || i} style={{ ...cardStyle, borderLeft: `4px solid ${accent}`, position: 'relative' }}>
-              <h3 style={{ fontFamily: T.fontSans, fontWeight: 700, fontSize: 15, margin: '0 0 4px', color: T.text }}>{a.title}</h3>
-              <p style={{ color: T.muted, fontSize: 13, margin: '0 0 12px' }}>Due: {new Date(a.dueDate).toLocaleDateString()}</p>
-              <p style={{ color: T.text, fontSize: 14 }}>{a.description}</p>
+            <div key={a.id || i} style={{ ...cardStyle, borderLeft: `4px solid ${accent}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                  <h3 style={{ fontFamily: T.fontSans, fontWeight: 700, fontSize: 16, margin: 0, color: T.text }}>{a.title}</h3>
+                  <span style={badge(accent, rgba(accent, 0.1))}>Max: {a.maxPoints || 20} pts</span>
+                </div>
+                <p style={{ color: T.muted, fontSize: 12, margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>📅 Due: {new Date(a.dueDate).toLocaleDateString()}</span>
+                </p>
+                <p style={{ color: T.text, fontSize: 14, lineHeight: 1.5, marginBottom: 16 }}>{a.description}</p>
+              </div>
               
-              <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-                <button onClick={() => window.print()} style={{ ...btnStyle('#10b981'), background: 'transparent', color: '#10b981', border: '1px solid #10b981', padding: '4px 8px', fontSize: 12 }}><Download size={14}/> PDF</button>
-                <button onClick={() => {
-                  fetch(`http://localhost:8080/api/assignments/${a.id || a.ID}`, { method: 'DELETE' }).then(() => fetchAssignments());
-                }} style={{ ...btnStyle('#ef4444'), background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', padding: '4px 8px', fontSize: 12 }}><Trash2 size={14}/> Delete</button>
+              <div style={{ borderTop: `1px solid ${T.borderLight}`, paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button
+                  onClick={() => handleOpenSubmissions(a)}
+                  style={{ ...btnStyle(accent), justifyContent: 'center', padding: '8px 12px', fontSize: 13 }}
+                >
+                  <Users size={14} /> View Submissions ({a.submissionCount || 0}) & Grade
+                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => window.print()} style={{ ...btnStyle(accent, true), flex: 1, justifyContent: 'center', padding: '6px 8px', fontSize: 12 }}>
+                    <Download size={13}/> Print PDF
+                  </button>
+                  <button onClick={() => {
+                    if (window.confirm('Delete this assignment?')) {
+                      fetch(`http://localhost:8080/api/assignments/${a.id || a.ID}`, { method: 'DELETE' }).then(() => fetchAssignments());
+                    }
+                  }} style={{ ...btnStyle('#ef4444', true), flex: 1, justifyContent: 'center', padding: '6px 8px', fontSize: 12 }}>
+                    <Trash2 size={13}/> Delete
+                  </button>
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
 
+      {/* CREATE ASSIGNMENT MODAL */}
       {showAssignModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div style={{ ...cardStyle, width: 400, maxWidth: '90%' }}>
-            <h2 style={{ margin: '0 0 16px', fontSize: 18 }}>Create Assignment</h2>
-            <form onSubmit={handleCreateAssignment} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
+          <div style={{ ...cardStyle, width: 440, maxWidth: '90%', position: 'relative' }}>
+            <button onClick={() => setShowAssignModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: T.muted }}><X size={18} /></button>
+            <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 16px', fontSize: 22, color: T.text }}>Create Assignment</h2>
+            <form onSubmit={handleCreateAssignment} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>Title</label>
-                <input required type="text" value={newAssign.title} onChange={e => setNewAssign(a => ({ ...a, title: e.target.value }))} style={inputStyle} />
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>Assignment Title</label>
+                <input required type="text" value={newAssign.title} onChange={e => setNewAssign(a => ({ ...a, title: e.target.value }))} placeholder="e.g. Chapter 4 Calculus Problem Set" style={inputStyle} />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>Description</label>
-                <textarea required value={newAssign.description} onChange={e => setNewAssign(a => ({ ...a, description: e.target.value }))} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>Instructions / Description</label>
+                <textarea required value={newAssign.description} onChange={e => setNewAssign(a => ({ ...a, description: e.target.value }))} rows={4} placeholder="Describe the task and expectations for the students..." style={{ ...inputStyle, resize: 'vertical' }} />
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>Due Date</label>
-                <input required type="date" value={newAssign.dueDate} onChange={e => setNewAssign(a => ({ ...a, dueDate: e.target.value }))} style={inputStyle} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>Due Date</label>
+                  <input required type="date" value={newAssign.dueDate} onChange={e => setNewAssign(a => ({ ...a, dueDate: e.target.value }))} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>Max Points</label>
+                  <input required type="number" min="1" max="100" value={newAssign.maxPoints} onChange={e => setNewAssign(a => ({ ...a, maxPoints: e.target.value }))} style={inputStyle} />
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-                <button type="submit" style={{ ...btnStyle(accent), flex: 1 }}>Save</button>
-                <button type="button" onClick={() => setShowAssignModal(false)} style={{ ...btnStyle('#6b7280'), flex: 1 }}>Cancel</button>
+                <button type="submit" style={{ ...btnStyle(accent), flex: 1, justifyContent: 'center' }}>Publish to Class</button>
+                <button type="button" onClick={() => setShowAssignModal(false)} style={{ ...btnStyle('#6b7280'), flex: 1, justifyContent: 'center' }}>Cancel</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW SUBMISSIONS & GRADING MODAL */}
+      {selectedAssignForGrading && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
+          <div style={{ ...cardStyle, width: 650, maxWidth: '95%', maxHeight: '88vh', overflowY: 'auto', position: 'relative' }}>
+            <button onClick={() => setSelectedAssignForGrading(null)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: T.muted }}><X size={20} /></button>
+            <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 4px', fontSize: 24, color: T.text }}>
+              Submissions: {selectedAssignForGrading.title}
+            </h2>
+            <p style={{ color: T.muted, fontSize: 13, margin: '0 0 18px' }}>
+              Max Points: <strong>{selectedAssignForGrading.maxPoints || 20}</strong> | Due: {new Date(selectedAssignForGrading.dueDate).toLocaleDateString()}
+            </p>
+
+            {submissionsLoading ? (
+              <div style={{ padding: '30px 0', textAlign: 'center', color: T.muted }}><Loader2 size={16} className="spin" /> Loading student submissions...</div>
+            ) : submissions.length === 0 ? (
+              <div style={{ padding: '40px 0', textAlign: 'center', background: '#faf9f7', borderRadius: 8, border: `1px solid ${T.border}` }}>
+                <p style={{ color: T.muted, margin: 0, fontSize: 14, fontStyle: 'italic' }}>No students have submitted work for this assignment yet.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {submissions.map((sub, i) => (
+                  <div key={sub.id || i} style={{ border: `1px solid ${T.border}`, borderRadius: 10, padding: 16, background: sub.status === 'graded' ? '#f0fdf4' : '#fff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <div>
+                        <strong style={{ fontSize: 15, color: T.text }}>{sub.studentName || 'Student'}</strong>
+                        <span style={{ fontSize: 12, color: T.light, display: 'block', marginTop: 2 }}>Submitted: {new Date(sub.submittedAt).toLocaleString()}</span>
+                      </div>
+                      <span style={sub.status === 'graded' ? badge('#15803d', '#dcfce7') : badge('#d97706', '#fef9c3')}>
+                        {sub.status === 'graded' ? `Graded: ${sub.grade}/${selectedAssignForGrading.maxPoints || 20}` : 'Needs Grading'}
+                      </span>
+                    </div>
+
+                    <div style={{ background: '#f8fafc', padding: 12, borderRadius: 6, border: '1px solid #e2e8f0', margin: '8px 0 12px', fontSize: 14, color: '#334155', whiteSpace: 'pre-wrap' }}>
+                      {sub.content || '(No text content submitted)'}
+                    </div>
+
+                    {sub.feedback && (
+                      <p style={{ fontSize: 13, color: '#0f766e', background: '#f0fdfa', padding: '8px 10px', borderRadius: 6, margin: '0 0 10px' }}>
+                        <strong>Feedback:</strong> {sub.feedback}
+                      </p>
+                    )}
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => setGradingModalData({ submissionId: sub.id, studentName: sub.studentName, content: sub.content, grade: sub.grade !== null && sub.grade !== undefined ? sub.grade : '', feedback: sub.feedback || '' })}
+                        style={{ ...btnStyle(accent), padding: '6px 14px', fontSize: 13 }}
+                      >
+                        {sub.status === 'graded' ? 'Edit Grade & Feedback' : 'Grade Submission'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* INDIVIDUAL GRADING MODAL */}
+      {gradingModalData && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300 }}>
+          <div style={{ ...cardStyle, width: 440, maxWidth: '90%', position: 'relative' }}>
+            <button onClick={() => setGradingModalData(null)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: T.muted }}><X size={18} /></button>
+            <h3 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 6px', fontSize: 22, color: T.text }}>
+              Grade: {gradingModalData.studentName}
+            </h3>
+            <p style={{ color: T.muted, fontSize: 12, margin: '0 0 16px' }}>Max scale: {selectedAssignForGrading?.maxPoints || 20} points</p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>Score ({selectedAssignForGrading?.maxPoints || 20} pts max)</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max={selectedAssignForGrading?.maxPoints || 100}
+                  value={gradingModalData.grade}
+                  onChange={e => setGradingModalData(d => ({ ...d, grade: e.target.value }))}
+                  placeholder={`e.g. 18.5`}
+                  style={inputStyle}
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>Teacher Feedback / Comments</label>
+                <textarea
+                  value={gradingModalData.feedback}
+                  onChange={e => setGradingModalData(d => ({ ...d, feedback: e.target.value }))}
+                  rows={3}
+                  placeholder="Well done, excellent working out on step 3..."
+                  style={{ ...inputStyle, resize: 'vertical' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                <button
+                  disabled={saveGradeLoading || gradingModalData.grade === ''}
+                  onClick={() => handleSaveGrade(gradingModalData.submissionId, gradingModalData.grade, gradingModalData.feedback)}
+                  style={{ ...btnStyle(accent), flex: 1, justifyContent: 'center' }}
+                >
+                  {saveGradeLoading ? 'Saving...' : 'Save & Return Grade'}
+                </button>
+                <button type="button" onClick={() => setGradingModalData(null)} style={{ ...btnStyle('#6b7280'), flex: 1, justifyContent: 'center' }}>Cancel</button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -707,11 +948,20 @@ export default function TeacherPortal() {
   );
 
   const fetchClassesAgain = () => {
-    fetch(`http://localhost:8080/api/classes?schoolId=${config.schoolId}`)
+    const tid = config?.id || config?.userId || '';
+    const sid = config?.schoolId || '';
+    fetch(`http://localhost:8080/api/classes?schoolId=${sid}`)
       .then(r => r.json())
       .then(c => {
-        const mine = (c || []).filter(cls => cls.teacherId === config.id || cls.teacherId === config.name);
-        setMyClasses(mine);
+        const mine = (c || []).filter(cls => !cls.teacherId || cls.teacherId === tid || cls.teacherId === config.name || String(cls.teacherId) === String(tid));
+        const list = mine.length > 0 ? mine : (c || []);
+        setMyClasses(list);
+        if (list.length > 0) {
+          if (!attClassId) setAttClassId(list[0].id || list[0].ID);
+          if (!gradingClassId) setGradingClassId(list[0].id || list[0].ID);
+          if (!assignClassId) setAssignClassId(list[0].id || list[0].ID);
+          if (!annClassId) setAnnClassId(list[0].id || list[0].ID);
+        }
       });
   };
 
@@ -760,6 +1010,8 @@ export default function TeacherPortal() {
     e.preventDefault();
     if (!newClassName || !newClassSubject) return;
     setCreateClassLoading(true);
+    setClassSuccess('');
+    const tid = config.id || config.userId || '';
     fetch(`http://localhost:8080/api/classes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -768,14 +1020,21 @@ export default function TeacherPortal() {
         name: newClassName,
         subject: newClassSubject,
         year: newClassYear,
-        teacherId: config.id
+        teacherId: tid
       })
-    }).then(r => {
-      if (r.ok) {
-        setShowCreateClassModal(false);
-        setNewClassName(''); setNewClassSubject(''); setNewClassYear('');
-        fetchClassesAgain();
+    }).then(async r => {
+      if (!r.ok) {
+        const txt = await r.text();
+        throw new Error(txt || 'Failed to create class');
       }
+      return r.json();
+    }).then(created => {
+      setShowCreateClassModal(false);
+      setNewClassName(''); setNewClassSubject(''); setNewClassYear('');
+      setClassSuccess(`Class "${created.name || newClassName}" created successfully!`);
+      fetchClassesAgain();
+    }).catch(err => {
+      alert('Error creating class: ' + err.message);
     }).finally(() => setCreateClassLoading(false));
   };
 
@@ -790,6 +1049,12 @@ export default function TeacherPortal() {
           <Plus size={15} /> Create Class
         </button>
       </div>
+
+      {classSuccess && (
+        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d', padding: '12px 16px', borderRadius: 8, fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <CheckCircle2 size={16} /> {classSuccess}
+        </div>
+      )}
 
       {myClasses.length === 0 ? (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '60px 24px' }}>
@@ -946,7 +1211,25 @@ export default function TeacherPortal() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: T.pageBg, fontFamily: T.fontSans }}>
-      <div style={{ width: 252, background: T.sidebarBg, borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 0, height: '100vh' }}>
+
+      {/* MOBILE HEADER (only visible on mobile) */}
+      <div className="portal-mobile-header print-hide">
+        <button
+          className="portal-mobile-menu-btn"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-label="Toggle navigation"
+        >
+          {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+        <img src="/logo.png" alt="Edvance Logo" style={{ height: 28, objectFit: 'contain' }} />
+        <span className="portal-mobile-role-badge">Teacher</span>
+      </div>
+
+      {sidebarOpen && <div
+        className={`portal-sidebar print-hide portal-sidebar--open`}
+        style={{ width: 252, background: T.sidebarBg, borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 0, height: '100vh' }}
+      >
+        <button className="portal-sidebar-overlay-close" onClick={() => setSidebarOpen(false)} aria-label="Close menu">✕</button>
         <div style={{ padding: '24px 20px', borderBottom: `1px solid ${T.borderLight}` }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <img src="/logo.png" alt="Edvance Logo" style={{ height: 48, objectFit: 'contain', alignSelf: 'flex-start' }} />
@@ -954,14 +1237,34 @@ export default function TeacherPortal() {
           </div>
         </div>
         <nav style={{ flex: 1, padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {navItems.map(item => <button key={item.id} onClick={() => setActiveTab(item.id)} style={navItemStyle(activeTab === item.id, accent)}><item.icon size={16} />{item.label}</button>)}
+          {navItems.map(item => (
+            <button key={item.id} onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }} style={navItemStyle(activeTab === item.id, accent)}>
+              <item.icon size={16} />{item.label}
+            </button>
+          ))}
         </nav>
         <div style={{ padding: '12px 10px', borderTop: `1px solid ${T.borderLight}` }}>
           <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444'), color: '#ef4444' }}><LogOut size={16} />Sign Out</button>
         </div>
+      </div>}
+      {sidebarOpen && <div className="portal-sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
+
+      {/* MAIN */}
+      <div className="print-main portal-main-content" style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
+        <div className="portal-desktop-toolbar print-hide">
+          <button className="portal-desktop-toggle-btn" onClick={() => setSidebarOpen(v => !v)} title={sidebarOpen ? 'Hide left sidebar' : 'Show left sidebar'}>
+            {sidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+            <span>{sidebarOpen ? 'Hide Nav' : 'Show Nav'}</span>
+          </button>
+          <button className="portal-desktop-toggle-btn" onClick={() => setRightPanelOpen(v => !v)} title={rightPanelOpen ? 'Hide right panel' : 'Show right panel'}>
+            {rightPanelOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
+            <span>{rightPanelOpen ? 'Hide Panel' : 'Show Panel'}</span>
+          </button>
+        </div>
+        <div style={{ padding: '12px 52px 48px' }}>{renderContent()}</div>
       </div>
-      <div style={{ flex: 1, padding: '44px 52px', overflowY: 'auto' }}>{renderContent()}</div>
-      <div style={{ width: 256, background: T.sidebarBg, borderLeft: `1px solid ${T.border}`, padding: '24px 18px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 22, position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
+
+      {rightPanelOpen && <div className="portal-right-panel print-hide" style={{ width: 256, background: T.sidebarBg, borderLeft: `1px solid ${T.border}`, padding: '24px 18px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 22, position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
         <div style={{ textAlign: 'center', paddingBottom: 18, borderBottom: `1px solid ${T.borderLight}` }}>
           <div style={{ width: 60, height: 60, borderRadius: '50%', background: rgba(accent, 0.1), border: `2px solid ${rgba(accent, 0.25)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 24, color: accent }}>{name.charAt(0)}</div>
           <p style={{ margin: '0 0 4px', fontWeight: 700, color: T.text, fontSize: 14 }}>{name}</p>
@@ -976,7 +1279,9 @@ export default function TeacherPortal() {
             </div>
           ))}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
+
+

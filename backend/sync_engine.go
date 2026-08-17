@@ -64,6 +64,13 @@ func (se *SyncEngine) SyncFromJSONToPostgres() error {
 		return nil
 	}
 
+	var existingSchools int
+	se.db.QueryRow("SELECT COUNT(*) FROM schools").Scan(&existingSchools)
+	if existingSchools > 0 {
+		log.Println("[Sync] ✅ PostgreSQL already contains school data. Skipping initial JSON sync for fast startup.")
+		return nil
+	}
+
 	log.Println("[Sync] 🔄 Starting automatic sync from JSON to PostgreSQL...")
 
 	// Sync schools

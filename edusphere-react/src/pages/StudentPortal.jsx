@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Calendar, BookOpen, FileText, Award, CheckSquare, Mail, User, LogOut, Plus, Clock, ChevronRight, Bell, Download, X } from 'lucide-react';
+import { LayoutDashboard, Calendar, BookOpen, FileText, Award, CheckSquare, Mail, User, LogOut, Plus, Clock, ChevronRight, Bell, Download, X, Menu, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { T, rgba, navItemStyle, cardStyle, inputStyle, btnStyle, badge } from '../styles/portalTheme';
 
 export default function StudentPortal() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [config, setConfig] = useState(null);
   
   // Data states
@@ -18,6 +20,12 @@ export default function StudentPortal() {
   const [classAssignments, setClassAssignments] = useState([]);
   const [marksList, setMarksList] = useState([]);
   const [assignmentsList, setAssignmentsList] = useState([]);
+  const [studentSubmissions, setStudentSubmissions] = useState({});
+  const [submittingAssign, setSubmittingAssign] = useState(null);
+  const [submissionText, setSubmissionText] = useState('');
+  const [submissionFileUrl, setSubmissionFileUrl] = useState('');
+  const [isSubmittingWork, setIsSubmittingWork] = useState(false);
+  const [submitSuccessMsg, setSubmitSuccessMsg] = useState('');
   const [inboxItems, setInboxItems] = useState([]);
   const [teachersList, setTeachersList] = useState([]);
   const [attendanceData, setAttendanceData] = useState([]);
@@ -103,6 +111,17 @@ export default function StudentPortal() {
       const asmRes = await fetch(`${API}/api/assignments${qs}&studentId=${sid}`);
       if (asmRes.ok) setAssignmentsList(await asmRes.json());
 
+      // Student Submissions
+      const subRes = await fetch(`${API}/api/assignments/student-submissions?studentId=${sid}`);
+      if (subRes.ok) {
+        const subs = await subRes.json();
+        const subMap = {};
+        (subs || []).forEach(s => {
+          subMap[s.assignmentId] = s;
+        });
+        setStudentSubmissions(subMap);
+      }
+
       // Inbox (Messages + Announcements)
       const msgRes = await fetch(`${API}/api/messages?userId=${sid}&box=inbox`);
       const annRes = await fetch(`${API}/api/announcements${qs}&studentId=${sid}`);
@@ -137,7 +156,14 @@ export default function StudentPortal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config]);
 
-  if (!config) return null;
+  if (!config) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, background: '#f5f4f0' }}>
+      <div style={{ width: 40, height: 40, border: '4px solid #e5e7eb', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }}/>
+      <p style={{ color: '#9ca3af', fontSize: 14, fontFamily: 'system-ui' }}>Loading your portal...</p>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+
   const accent = config.primaryColor || '#2563eb';
   const name = config.name || 'Student';
 
@@ -201,9 +227,9 @@ export default function StudentPortal() {
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
             {[
-              { label: 'Avg Score', value: dashboardData.avgScore.toFixed(1), color: accent },
-              { label: 'Classes', value: dashboardData.classes, color: '#059669' },
-              { label: 'Unread Msgs', value: dashboardData.unread, color: '#d97706' },
+              { label: 'Avg Score', value: Number(dashboardData.avgScore || 0).toFixed(1), color: accent },
+              { label: 'Classes', value: dashboardData.classes || 0, color: '#059669' },
+              { label: 'Unread Msgs', value: dashboardData.unread || 0, color: '#d97706' },
               { label: 'Assignments', value: assignmentsList.length, color: '#dc2626' }
             ].map(s => (
               <div key={s.label} style={{ ...cardStyle, borderTop: `3px solid ${s.color}` }}>
@@ -518,34 +544,183 @@ export default function StudentPortal() {
     URL.revokeObjectURL(url);
   };
 
+  const handleSubmitAssignmentWork = async (e) => {
+    e.preventDefault();
+    if (!submittingAssign) return;
+    setIsSubmittingWork(true);
+    setSubmitSuccessMsg('');
+    const sid = config.id || config.userId || '';
+    const schoolId = config.schoolId || '';
+    
+    try {
+      const res = await fetch(`${API}/api/assignments/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assignmentId: submittingAssign.id || submittingAssign.ID,
+          schoolId: schoolId,
+          classId: submittingAssign.classId || '',
+          studentId: sid,
+          studentName: config.name || 'Student',
+          content: submissionText,
+          fileUrl: submissionFileUrl
+        })
+      });
+      if (res.ok) {
+        setSubmitSuccessMsg('Assignment submitted successfully to your teacher!');
+        setTimeout(() => setSubmitSuccessMsg(''), 4000);
+        setSubmittingAssign(null);
+        setSubmissionText('');
+        setSubmissionFileUrl('');
+        fetchData();
+      } else {
+        const txt = await res.text();
+        alert('Failed to submit: ' + txt);
+      }
+    } catch (err) {
+      alert('Network error: ' + err.message);
+    } finally {
+      setIsSubmittingWork(false);
+    }
+  };
+
   const renderAssignments = () => {
     const now = new Date();
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div><p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Tasks</p><h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Assignments</h1></div>
-        <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: T.fontSans }}>
-            <thead><tr style={{ background: '#faf9f7' }}>{['Assignment', 'Class', 'Due Date', 'Status', ''].map(h => <th key={h} style={{ padding: '12px 20px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: T.light, letterSpacing: '0.5px', textTransform: 'uppercase', borderBottom: `1px solid ${T.border}` }}>{h}</th>)}</tr></thead>
-            <tbody>
-              {loading ? <tr><td colSpan={5} style={{padding: 20}}>Loading...</td></tr> : assignmentsList.length === 0 ? <tr><td colSpan={5} style={{padding: 20, color: T.muted}}>No assignments found.</td></tr> : assignmentsList.map((a, i) => {
-                const isOverdue = new Date(a.dueDate) < now;
-                return (
-                  <tr key={i} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
-                    <td style={{ padding: '14px 20px', fontWeight: 600, color: T.text, fontSize: 14 }}>{a.title}</td>
-                    <td style={{ padding: '14px 20px', color: T.muted, fontSize: 13 }}>{a.className}</td>
-                    <td style={{ padding: '14px 20px', fontSize: 13, color: T.muted }}><Clock size={12} style={{ display: 'inline', marginRight: 4 }} />{new Date(a.dueDate).toLocaleDateString()}</td>
-                    <td style={{ padding: '14px 20px' }}>
-                      <span style={isOverdue ? badge('#dc2626', '#fef2f2') : badge(accent, rgba(accent, 0.1))}>{isOverdue ? 'Overdue' : 'Upcoming'}</span>
-                    </td>
-                    <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                      <button onClick={() => handleDownloadAssignment(a)} style={{...btnStyle(accent, true), padding: '6px 12px', fontSize: 12}}><Download size={14}/> Download</button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Coursework</p>
+            <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Assignments & Submissions</h1>
+          </div>
         </div>
+
+        {submitSuccessMsg && (
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d', padding: '12px 16px', borderRadius: 8, fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Award size={16} /> {submitSuccessMsg}
+          </div>
+        )}
+
+        {loading ? <div style={{ color: T.muted }}><Clock size={16} className="spin" /> Loading assignments...</div> : assignmentsList.length === 0 ? (
+          <div style={{ ...cardStyle, textAlign: 'center', padding: '60px 20px' }}>
+            <FileText size={36} style={{ color: T.light, marginBottom: 12 }} />
+            <h3 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 6px', color: T.text }}>No Assignments Found</h3>
+            <p style={{ color: T.muted, fontSize: 14 }}>You are up to date! Check back when your teachers post new assignments.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
+            {assignmentsList.map((a, i) => {
+              const sub = studentSubmissions[a.id || a.ID];
+              const isOverdue = new Date(a.dueDate) < now && !sub;
+              const isGraded = sub && sub.status === 'graded';
+              const isSubmitted = sub && sub.status === 'submitted';
+
+              return (
+                <div key={a.id || i} style={{ ...cardStyle, borderLeft: `4px solid ${isGraded ? '#10b981' : isSubmitted ? '#3b82f6' : isOverdue ? '#ef4444' : accent}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                      <span style={badge(accent, rgba(accent, 0.1))}>{a.className || 'Class'}</span>
+                      {isGraded ? (
+                        <span style={badge('#15803d', '#dcfce7')}>Score: {sub.grade}/{a.maxPoints || 20}</span>
+                      ) : isSubmitted ? (
+                        <span style={badge('#1d4ed8', '#dbeafe')}>✓ Submitted</span>
+                      ) : isOverdue ? (
+                        <span style={badge('#dc2626', '#fee2e2')}>Overdue</span>
+                      ) : (
+                        <span style={badge('#d97706', '#fef9c3')}>Due {new Date(a.dueDate).toLocaleDateString()}</span>
+                      )}
+                    </div>
+
+                    <h3 style={{ fontFamily: T.fontSans, fontWeight: 700, fontSize: 16, margin: '8px 0 4px', color: T.text }}>{a.title}</h3>
+                    <p style={{ color: T.muted, fontSize: 12, margin: '0 0 10px' }}>Teacher: {a.teacherName || 'Instructor'} | Max: {a.maxPoints || 20} pts</p>
+                    <p style={{ color: T.text, fontSize: 14, lineHeight: 1.5, margin: '0 0 14px' }}>{a.description}</p>
+
+                    {/* Graded Feedback Callout */}
+                    {isGraded && sub.feedback && (
+                      <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 12px', margin: '0 0 14px' }}>
+                        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#15803d' }}>Teacher's Feedback:</p>
+                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#166534', fontStyle: 'italic' }}>"{sub.feedback}"</p>
+                      </div>
+                    )}
+
+                    {/* Submitted text preview */}
+                    {sub && sub.content && (
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', margin: '0 0 14px', fontSize: 12, color: '#64748b' }}>
+                        <strong>Your answer:</strong> {sub.content.length > 80 ? sub.content.slice(0, 80) + '...' : sub.content}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8, borderTop: `1px solid ${T.borderLight}`, paddingTop: 12 }}>
+                    <button
+                      onClick={() => {
+                        setSubmittingAssign(a);
+                        setSubmissionText(sub ? sub.content : '');
+                        setSubmissionFileUrl(sub ? sub.fileUrl : '');
+                      }}
+                      style={{ ...btnStyle(accent), flex: 1, justifyContent: 'center', fontSize: 13, padding: '8px 12px' }}
+                    >
+                      {isGraded ? 'Review Submission' : isSubmitted ? 'Edit / Resubmit' : 'Turn In Work'}
+                    </button>
+                    <button onClick={() => handleDownloadAssignment(a)} style={{ ...btnStyle(accent, true), padding: '8px 10px', fontSize: 12 }} title="Download Instructions">
+                      <Download size={14} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* SUBMIT ASSIGNMENT WORK MODAL */}
+        {submittingAssign && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
+            <div style={{ ...cardStyle, width: 500, maxWidth: '92%', position: 'relative', maxHeight: '88vh', overflowY: 'auto' }}>
+              <button onClick={() => setSubmittingAssign(null)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: T.muted }}><X size={18} /></button>
+              <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 4px', fontSize: 22, color: T.text }}>
+                {submittingAssign.title}
+              </h2>
+              <p style={{ color: T.muted, fontSize: 13, margin: '0 0 14px' }}>
+                Class: {submittingAssign.className} | Due: {new Date(submittingAssign.dueDate).toLocaleDateString()} | Max: {submittingAssign.maxPoints || 20} pts
+              </p>
+
+              <div style={{ background: '#faf9f7', padding: 12, borderRadius: 8, border: `1px solid ${T.borderLight}`, marginBottom: 16, fontSize: 13, color: T.text }}>
+                <strong>Assignment Instructions:</strong>
+                <p style={{ margin: '6px 0 0', whiteSpace: 'pre-wrap' }}>{submittingAssign.description}</p>
+              </div>
+
+              <form onSubmit={handleSubmitAssignmentWork} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>Your Solution / Answer Text</label>
+                  <textarea
+                    required
+                    rows={6}
+                    value={submissionText}
+                    onChange={e => setSubmissionText(e.target.value)}
+                    placeholder="Type your complete solution, essay, or homework response here..."
+                    style={{ ...inputStyle, resize: 'vertical' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>File / Drive Link (Optional)</label>
+                  <input
+                    type="url"
+                    value={submissionFileUrl}
+                    onChange={e => setSubmissionFileUrl(e.target.value)}
+                    placeholder="https://drive.google.com/file/..."
+                    style={inputStyle}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                  <button type="submit" disabled={isSubmittingWork} style={{ ...btnStyle(accent), flex: 1, justifyContent: 'center' }}>
+                    {isSubmittingWork ? 'Submitting...' : 'Submit Assignment to Teacher'}
+                  </button>
+                  <button type="button" onClick={() => setSubmittingAssign(null)} style={{ ...btnStyle('#6b7280'), flex: 1, justifyContent: 'center' }}>Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -824,8 +999,21 @@ export default function StudentPortal() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: T.pageBg, fontFamily: T.fontSans }}>
-      {/* SIDEBAR */}
-      <div style={{ width: 252, background: T.sidebarBg, borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 0, height: '100vh' }}>
+
+      {/* MOBILE HEADER */}
+      <div className="portal-mobile-header print-hide">
+        <button className="portal-mobile-menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle navigation">
+          {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+        <img src="/logo.png" alt="Edvance Logo" style={{ height: 28, objectFit: 'contain' }} />
+        <span className="portal-mobile-role-badge">Student</span>
+      </div>
+
+      {sidebarOpen && <div
+        className={`portal-sidebar print-hide portal-sidebar--open`}
+        style={{ width: 252, background: T.sidebarBg, borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 0, height: '100vh' }}
+      >
+        <button className="portal-sidebar-overlay-close" onClick={() => setSidebarOpen(false)} aria-label="Close menu">✕</button>
         <div style={{ padding: '24px 20px', borderBottom: `1px solid ${T.borderLight}` }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <img src="/logo.png" alt="Edvance Logo" style={{ height: 48, objectFit: 'contain', alignSelf: 'flex-start' }} />
@@ -833,18 +1021,34 @@ export default function StudentPortal() {
           </div>
         </div>
         <nav style={{ flex: 1, padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {navItems.map(item => <button key={item.id} onClick={() => setActiveTab(item.id)} style={navItemStyle(activeTab === item.id, accent)}><item.icon size={16} />{item.label}</button>)}
+          {navItems.map(item => (
+            <button key={item.id} onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }} style={navItemStyle(activeTab === item.id, accent)}>
+              <item.icon size={16} />{item.label}
+            </button>
+          ))}
         </nav>
         <div style={{ padding: '12px 10px', borderTop: `1px solid ${T.borderLight}` }}>
           <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444'), color: '#ef4444' }}><LogOut size={16} />Sign Out</button>
         </div>
-      </div>
+      </div>}
+      {sidebarOpen && <div className="portal-sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
       {/* MAIN */}
-      <div style={{ flex: 1, padding: '44px 52px', overflowY: 'auto' }}>{renderContent()}</div>
+      <div className="print-main portal-main-content" style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
+        <div className="portal-desktop-toolbar print-hide">
+          <button className="portal-desktop-toggle-btn" onClick={() => setSidebarOpen(v => !v)}>
+            {sidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+            <span>{sidebarOpen ? 'Hide Nav' : 'Show Nav'}</span>
+          </button>
+          <button className="portal-desktop-toggle-btn" onClick={() => setRightPanelOpen(v => !v)}>
+            {rightPanelOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
+            <span>{rightPanelOpen ? 'Hide Panel' : 'Show Panel'}</span>
+          </button>
+        </div>
+        <div style={{ padding: '12px 52px 48px' }}>{renderContent()}</div>
+      </div>
 
-      {/* RIGHT PANEL */}
-      <div style={{ width: 260, background: T.sidebarBg, borderLeft: `1px solid ${T.border}`, padding: '24px 18px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 22, position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
+      {rightPanelOpen && <div className="portal-right-panel print-hide" style={{ width: 260, background: T.sidebarBg, borderLeft: `1px solid ${T.border}`, padding: '24px 18px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 22, position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
         <div style={{ textAlign: 'center', paddingBottom: 18, borderBottom: `1px solid ${T.borderLight}` }}>
           <div style={{ width: 60, height: 60, borderRadius: '50%', background: rgba(accent, 0.1), border: `2px solid ${rgba(accent, 0.25)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 24, color: accent }}>{name.charAt(0)}</div>
           <p style={{ margin: '0 0 2px', fontWeight: 700, color: T.text, fontSize: 14 }}>{name}</p>
@@ -852,7 +1056,7 @@ export default function StudentPortal() {
         </div>
         <div>
           <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '1px' }}>Quick Stats</p>
-          {[{ label: 'Avg Score', value: dashboardData.avgScore.toFixed(1) }, { label: 'Classes', value: dashboardData.classes }, { label: 'Unread', value: dashboardData.unread }].map(s => (
+          {[{ label: 'Avg Score', value: Number(dashboardData.avgScore || 0).toFixed(1) }, { label: 'Classes', value: dashboardData.classes || 0 }, { label: 'Unread', value: dashboardData.unread || 0 }].map(s => (
             <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${T.borderLight}` }}>
               <span style={{ color: T.muted, fontSize: 13 }}>{s.label}</span>
               <strong style={{ color: T.text }}>{s.value}</strong>
@@ -868,7 +1072,7 @@ export default function StudentPortal() {
             </div>
           )}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

@@ -4,11 +4,13 @@ import {
   LayoutDashboard, UserPlus, Users, GraduationCap, Settings,
   LogOut, Building2, CheckCircle2, AlertCircle, Loader2,
   Palette, Trash2, Plus, BookOpen, Shield, ToggleLeft,
-  ToggleRight, X, School, FileSpreadsheet, Upload, Download, FileText
+  ToggleRight, X, School, FileSpreadsheet, Upload, Download, FileText,
+  Menu, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen
 } from 'lucide-react';
 import { T, rgba, navItemStyle, cardStyle, inputStyle, btnStyle, badge } from '../styles/portalTheme';
 import ReportCardControls from '../components/ReportCardControls';
 import ReportCardView from '../components/ReportCardView';
+import AdminReportCardGenerator from '../components/AdminReportCardGenerator';
 import * as XLSX from 'xlsx';
 
 const API = 'http://localhost:8080';
@@ -17,6 +19,8 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [config, setConfig] = useState(null);
   const [activeView, setActiveView] = useState('overview');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState([]);
   const [admins, setAdmins] = useState([]);
@@ -127,7 +131,13 @@ export default function AdminDashboard() {
       .then(r => r.json()).then(d => setMessages(Array.isArray(d) ? d : [])).catch(() => {});
   }, [config, fetchClasses, fetchSequences]);
 
-  if (!config) return <div style={{ background: T.pageBg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 size={28} color="#999" /></div>;
+  if (!config) return (
+    <div style={{ background: '#f5f4f0', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
+      <Loader2 size={32} color="#999" style={{ animation: 'spin 1s linear infinite' }}/>
+      <p style={{ color: '#999', fontSize: 14 }}>Loading dashboard...</p>
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
 
   const accent = config.primaryColor || '#2563eb';
 
@@ -197,60 +207,82 @@ export default function AdminDashboard() {
     { id: 'settings', label: 'School Settings', icon: Settings },
   ];
 
-  const UserTable = ({ users, role }) => (
-    <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: `1px solid ${T.border}` }}>
-        <h3 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 20, margin: 0, color: T.text }}>{role}s <span style={{ color: T.muted, fontStyle: 'normal', fontFamily: T.fontSans, fontSize: 14 }}>({users.length})</span></h3>
-        <button onClick={() => { setNewUserRole(role); setShowAddUser(true); setFormSuccess(null); setFormError(null); }} style={btnStyle(accent)}>
-          <Plus size={15} /> Add {role}
-        </button>
+  const renderUserMgmt = (role, list) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div>
+        <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>User Management</p>
+        <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Manage {role}s</h1>
       </div>
-      {users.length === 0 ? (
-        <div style={{ padding: '48px', textAlign: 'center', color: T.muted }}>No {role.toLowerCase()}s registered yet.</div>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: T.fontSans }}>
-          <thead><tr style={{ background: '#faf9f7' }}>{['Name', 'Email', 'Status', ''].map(h => <th key={h} style={{ padding: '10px 24px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: T.light, letterSpacing: '0.5px', textTransform: 'uppercase', borderBottom: `1px solid ${T.border}` }}>{h}</th>)}</tr></thead>
-          <tbody>{users.map(u => (
-            <tr key={u.id} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
-              <td style={{ padding: '14px 24px', fontWeight: 600, color: T.text }}>{u.name}</td>
-              <td style={{ padding: '14px 24px', color: T.muted, fontSize: 13 }}>{u.email}</td>
-              <td style={{ padding: '14px 24px' }}><span style={u.firstLogin ? badge('#d97706', '#fffbeb') : badge('#15803d', '#f0fdf4')}>{u.firstLogin ? 'Pending Login' : 'Active'}</span></td>
-              <td style={{ padding: '14px 24px' }}><button onClick={() => handleDeleteUser(u.id, role)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 500, fontFamily: T.fontSans }}><Trash2 size={13} /> Remove</button></td>
-            </tr>
-          ))}</tbody>
-        </table>
+
+      {/* Add User Form — inline (not a sub-component) to preserve focus */}
+      {showAddUser && newUserRole === role && (
+        <div style={{ ...cardStyle, border: `1.5px solid ${rgba(accent, 0.3)}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
+            <h4 style={{ fontFamily: T.fontSans, fontWeight: 700, color: T.text, margin: 0 }}>Register New {role}</h4>
+            <button onClick={() => { setShowAddUser(false); setFormSuccess(null); setFormError(null); }} style={{ background: 'none', border: 'none', color: T.muted, cursor: 'pointer' }}><X size={18} /></button>
+          </div>
+          {formSuccess ? (
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: 20 }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12, color: '#15803d' }}><CheckCircle2 size={20} /><strong>Account Created!</strong></div>
+              <p style={{ color: T.muted, fontSize: 14, margin: '0 0 16px' }}>Share credentials securely with <strong style={{ color: T.text }}>{formSuccess.name}</strong>.</p>
+              <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 8, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div><p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: 1 }}>Email</p><strong style={{ color: T.text }}>{formSuccess.email}</strong></div>
+                <div><p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: 1 }}>Temp Password</p><strong style={{ color: T.text, fontFamily: 'monospace', fontSize: 15 }}>{formSuccess.password}</strong></div>
+              </div>
+              <button onClick={() => setFormSuccess(null)} style={{ ...btnStyle(accent), marginTop: 16 }}>Add Another</button>
+            </div>
+          ) : (
+            <form onSubmit={handleRegisterUser} style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Full Name</label>
+                <input
+                  type="text" required
+                  value={newUserName}
+                  onChange={e => setNewUserName(e.target.value)}
+                  placeholder="e.g. Jane Doe"
+                  style={inputStyle}
+                  autoFocus
+                />
+              </div>
+              {formError && <p style={{ color: '#ef4444', fontSize: 13, margin: 0 }}>{formError}</p>}
+              <button type="submit" disabled={isSubmitting} style={btnStyle(accent)}>{isSubmitting ? <Loader2 size={14} /> : <><Plus size={14} />Create</>}</button>
+            </form>
+          )}
+        </div>
       )}
+
+      {/* Add button when form is closed */}
+      {!showAddUser && (
+        <div>
+          <button onClick={() => { setNewUserRole(role); setShowAddUser(true); setFormSuccess(null); setFormError(null); }} style={btnStyle(accent)}>
+            <Plus size={15} /> Add {role}
+          </button>
+        </div>
+      )}
+
+      {/* Users Table — inline (not a sub-component) to preserve focus */}
+      <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: `1px solid ${T.border}` }}>
+          <h3 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 20, margin: 0, color: T.text }}>{role}s <span style={{ color: T.muted, fontStyle: 'normal', fontFamily: T.fontSans, fontSize: 14 }}>({list.length})</span></h3>
+        </div>
+        {list.length === 0 ? (
+          <div style={{ padding: '48px', textAlign: 'center', color: T.muted }}>No {role.toLowerCase()}s registered yet.</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: T.fontSans }}>
+            <thead><tr style={{ background: '#faf9f7' }}>{['Name', 'Email', 'Status', ''].map(h => <th key={h} style={{ padding: '10px 24px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: T.light, letterSpacing: '0.5px', textTransform: 'uppercase', borderBottom: `1px solid ${T.border}` }}>{h}</th>)}</tr></thead>
+            <tbody>{list.map(u => (
+              <tr key={u.id} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
+                <td style={{ padding: '14px 24px', fontWeight: 600, color: T.text }}>{u.name}</td>
+                <td style={{ padding: '14px 24px', color: T.muted, fontSize: 13 }}>{u.email}</td>
+                <td style={{ padding: '14px 24px' }}><span style={u.firstLogin ? badge('#d97706', '#fffbeb') : badge('#15803d', '#f0fdf4')}>{u.firstLogin ? 'Pending Login' : 'Active'}</span></td>
+                <td style={{ padding: '14px 24px' }}><button onClick={() => handleDeleteUser(u.id, role)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 500, fontFamily: T.fontSans }}><Trash2 size={13} /> Remove</button></td>
+              </tr>
+            ))}</tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
-
-  const AddUserForm = ({ role }) => showAddUser && newUserRole === role ? (
-    <div style={{ ...cardStyle, border: `1.5px solid ${rgba(accent, 0.3)}` }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
-        <h4 style={{ fontFamily: T.fontSans, fontWeight: 700, color: T.text, margin: 0 }}>Register New {role}</h4>
-        <button onClick={() => { setShowAddUser(false); setFormSuccess(null); setFormError(null); }} style={{ background: 'none', border: 'none', color: T.muted, cursor: 'pointer' }}><X size={18} /></button>
-      </div>
-      {formSuccess ? (
-        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: 20 }}>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12, color: '#15803d' }}><CheckCircle2 size={20} /><strong>Account Created!</strong></div>
-          <p style={{ color: T.muted, fontSize: 14, margin: '0 0 16px' }}>Share credentials securely with <strong style={{ color: T.text }}>{formSuccess.name}</strong>.</p>
-          <div style={{ background: '#fff', border: `1px solid ${T.border}`, borderRadius: 8, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div><p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: 1 }}>Email</p><strong style={{ color: T.text }}>{formSuccess.email}</strong></div>
-            <div><p style={{ margin: '0 0 3px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: 1 }}>Temp Password</p><strong style={{ color: T.text, fontFamily: 'monospace', fontSize: 15 }}>{formSuccess.password}</strong></div>
-          </div>
-          <button onClick={() => setFormSuccess(null)} style={{ ...btnStyle(accent), marginTop: 16 }}>Add Another</button>
-        </div>
-      ) : (
-        <form onSubmit={handleRegisterUser} style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Full Name</label>
-            <input type="text" required value={newUserName} onChange={e => setNewUserName(e.target.value)} placeholder="e.g. Jane Doe" style={inputStyle} />
-          </div>
-          {formError && <p style={{ color: '#ef4444', fontSize: 13, margin: 0 }}>{formError}</p>}
-          <button type="submit" disabled={isSubmitting} style={btnStyle(accent)}>{isSubmitting ? <Loader2 size={14} /> : <><Plus size={14} />Create</>}</button>
-        </form>
-      )}
-    </div>
-  ) : null;
 
   const renderOverview = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
@@ -279,15 +311,54 @@ export default function AdminDashboard() {
 
       {/* Performance SVG Chart */}
       <div style={cardStyle}>
-        <p style={{ fontFamily: T.fontSans, fontWeight: 600, color: T.text, margin: '0 0 20px', fontSize: 15 }}>School Performance Trend</p>
-        <svg viewBox="0 0 700 160" style={{ width: '100%', display: 'block' }}>
-          <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={accent} stopOpacity="0.15" /><stop offset="100%" stopColor={accent} stopOpacity="0" /></linearGradient></defs>
-          {[0, 40, 80, 120, 160].map((y, i) => <line key={i} x1="0" y1={y} x2="700" y2={y} stroke={T.border} strokeWidth="1" />)}
-          <polyline fill="none" stroke={accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points="0,130 87.5,110 175,75 262.5,95 350,50 437.5,65 525,35 612.5,45 700,22" />
-          <polygon fill="url(#ag)" points="0,130 87.5,110 175,75 262.5,95 350,50 437.5,65 525,35 612.5,45 700,22 700,160 0,160" />
-          {[[0,130],[87.5,110],[175,75],[262.5,95],[350,50],[437.5,65],[525,35],[612.5,45],[700,22]].map(([x,y],i) => <circle key={i} cx={x} cy={y} r="5" fill={accent} stroke="white" strokeWidth="2" />)}
-        </svg>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>{['Wk1','Wk2','Wk3','Wk4','Wk5','Wk6','Wk7','Wk8','Wk9'].map(w => <span key={w} style={{ color: T.light, fontSize: 11, fontWeight: 500 }}>{w}</span>)}</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div>
+            <p style={{ fontFamily: T.fontSans, fontWeight: 600, color: T.text, margin: '0 0 4px', fontSize: 15 }}>School Performance Trend</p>
+            <p style={{ color: T.muted, fontSize: 13, margin: 0 }}>Average academic performance per sequence</p>
+          </div>
+          {dashboardStats.avgScore && dashboardStats.avgScore !== '0' && dashboardStats.avgScore !== '0.0' && (
+            <span style={{ fontSize: 13, fontWeight: 600, color: accent, background: rgba(accent, 0.1), padding: '4px 12px', borderRadius: 20 }}>
+              Overall Avg: {dashboardStats.avgScore}/20
+            </span>
+          )}
+        </div>
+
+        {(!dashboardStats.chartData || dashboardStats.chartData.length === 0) ? (
+          <div style={{ padding: '36px 0', textAlign: 'center', color: T.muted, fontStyle: 'italic', background: '#faf9f7', borderRadius: 8, border: `1px solid ${T.borderLight}` }}>
+            No sequence grades entered yet to display school performance trend.
+          </div>
+        ) : (
+          <div>
+            <svg viewBox="0 0 700 160" style={{ width: '100%', display: 'block' }}>
+              <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={accent} stopOpacity="0.15" /><stop offset="100%" stopColor={accent} stopOpacity="0" /></linearGradient></defs>
+              {[0, 40, 80, 120, 160].map((y, i) => <line key={i} x1="0" y1={y} x2="700" y2={y} stroke={T.border} strokeWidth="1" />)}
+              {(() => {
+                const maxAvg = Math.max(...(dashboardStats.chartData || []).map(d => d.avg || 0), 20);
+                const points = dashboardStats.chartData.map((d, i) => {
+                  const x = (i / Math.max(1, dashboardStats.chartData.length - 1)) * 700;
+                  const y = 160 - (((d.avg || 0) / maxAvg) * 130);
+                  return [x, y];
+                });
+                const pointsStr = points.map(p => p.join(',')).join(' ');
+                const polyPoints = `0,160 ${pointsStr} 700,160`;
+                return (
+                  <>
+                    <polygon fill="url(#ag)" points={polyPoints} />
+                    <polyline fill="none" stroke={accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={pointsStr} />
+                    {points.map(([x,y],i) => <circle key={i} cx={x} cy={y} r="5" fill={accent} stroke="white" strokeWidth="2" />)}
+                  </>
+                );
+              })()}
+            </svg>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+              {dashboardStats.chartData.map((d, i) => (
+                <span key={i} style={{ color: T.light, fontSize: 11, fontWeight: 500 }}>
+                  {d.name} ({Number(d.avg || 0).toFixed(1)})
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div>
@@ -302,17 +373,6 @@ export default function AdminDashboard() {
           ))}
         </div>
       </div>
-    </div>
-  );
-
-  const renderUserMgmt = (role, list) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div>
-        <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>User Management</p>
-        <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Manage {role}s</h1>
-      </div>
-      <AddUserForm role={role} />
-      <UserTable users={list} role={role} />
     </div>
   );
 
@@ -683,70 +743,7 @@ export default function AdminDashboard() {
   };
 
   const renderReportCards = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div className="print-hide">
-        <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Academic Results</p>
-        <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Report Cards</h1>
-      </div>
-      
-      <div className="print-hide" style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Select Class</label>
-            <select value={rcClassId} onChange={e => setRcClassId(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
-              <option value="">-- Choose Class --</option>
-              {classes.map(c => <option key={c.ID || c.id} value={c.ID || c.id}>{c.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Term/Annual</label>
-            <select value={rcTermId} onChange={e => setRcTermId(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
-              <option value="T1">Term 1</option>
-              <option value="T2">Term 2</option>
-              <option value="Annual">Annual Average</option>
-            </select>
-          </div>
-          <button onClick={handleFetchReportCards} disabled={isFetchingRC} style={btnStyle(accent)}>
-            {isFetchingRC ? <Loader2 size={15} /> : 'Fetch Report Cards'}
-          </button>
-        </div>
-        
-        <div style={{ borderTop: `1px solid ${T.borderLight}`, paddingTop: 16, display: 'flex', gap: 10, alignItems: 'center' }}>
-          <button onClick={handleExcelTemplateDownload} style={{ ...btnStyle('#10b981'), background: 'transparent', color: '#10b981', border: '1px solid #10b981' }}>
-            <Download size={14} /> Download Template
-          </button>
-          
-          <label style={{ ...btnStyle('#10b981'), cursor: 'pointer', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Upload size={14} /> Upload Marks
-            <input type="file" accept=".xlsx, .xls" style={{ display: 'none' }} onChange={handleExcelUpload} />
-          </label>
-          {uploadRCStatus && <span style={{ fontSize: 13, color: T.text }}>{uploadRCStatus}</span>}
-        </div>
-      </div>
-
-      {reportCardsData.length > 0 && (
-        <>
-          <ReportCardControls
-            accent={accent}
-            onPrint={handlePrintRC}
-            isEditing={isRCEditing}
-            onToggleEdit={() => setIsRCEditing(v => !v)}
-            customFields={rcCustomFields}
-            onFieldChange={(key, val) => setRcCustomFields(prev => ({ ...prev, [key]: val }))}
-          />
-          <div className="print-main">
-            <ReportCardView
-              reportCards={reportCardsData}
-              accent={accent}
-              config={config}
-              isEditing={isRCEditing}
-              customFields={rcCustomFields}
-              onFieldChange={(key, val) => setRcCustomFields(prev => ({ ...prev, [key]: val }))}
-            />
-          </div>
-        </>
-      )}
-    </div>
+    <AdminReportCardGenerator config={config} accent={accent} />
   );
 
   const renderEnrollment = () => {
@@ -909,8 +906,27 @@ export default function AdminDashboard() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: T.pageBg, fontFamily: T.fontSans }}>
+
+      {/* MOBILE HEADER (only visible on mobile) */}
+      <div className="portal-mobile-header print-hide">
+        <button
+          className="portal-mobile-menu-btn"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-label="Toggle navigation"
+        >
+          {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+        <img src="/logo.png" alt="Edvance Logo" style={{ height: 28, objectFit: 'contain' }} />
+        <span className="portal-mobile-role-badge">Admin</span>
+      </div>
+
       {/* SIDEBAR */}
-      <div className="print-hide" style={{ width: 256, background: T.sidebarBg, borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 0, height: '100vh' }}>
+      {sidebarOpen && <div
+        className={`portal-sidebar print-hide portal-sidebar--open`}
+        style={{ width: 256, background: T.sidebarBg, borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 0, height: '100vh' }}
+      >
+        <button className="portal-sidebar-overlay-close" onClick={() => setSidebarOpen(false)} aria-label="Close menu">✕</button>
+
         <div style={{ padding: '28px 20px 24px', borderBottom: `1px solid ${T.borderLight}` }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <img src="/logo.png" alt="Edvance Logo" style={{ height: 48, objectFit: 'contain', alignSelf: 'flex-start' }} />
@@ -919,7 +935,16 @@ export default function AdminDashboard() {
         </div>
         <nav style={{ flex: 1, padding: '12px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {navItems.map(item => (
-            <button key={item.id} onClick={() => { setActiveView(item.id); setShowAddUser(false); setShowAddClass(false); }} style={navItemStyle(activeView === item.id, accent)}>
+            <button
+              key={item.id}
+              onClick={() => {
+                setActiveView(item.id);
+                setShowAddUser(false);
+                setShowAddClass(false);
+                setSidebarOpen(false);
+              }}
+              style={navItemStyle(activeView === item.id, accent)}
+            >
               <item.icon size={17} /> {item.label}
             </button>
           ))}
@@ -927,13 +952,36 @@ export default function AdminDashboard() {
         <div style={{ padding: '16px 12px', borderTop: `1px solid ${T.borderLight}` }}>
           <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444'), color: '#ef4444' }}><LogOut size={17} /> Sign Out</button>
         </div>
-      </div>
+      </div>}
+      {/* Mobile overlay backdrop */}
+      {sidebarOpen && <div className="portal-sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
       {/* MAIN */}
-      <div className="print-main" style={{ flex: 1, padding: '48px 52px', overflowY: 'auto' }}>{renderContent()}</div>
+      <div className="print-main portal-main-content" style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
+        {/* Desktop sidebar toggle toolbar */}
+        <div className="portal-desktop-toolbar print-hide">
+          <button
+            className="portal-desktop-toggle-btn"
+            onClick={() => setSidebarOpen(v => !v)}
+            title={sidebarOpen ? 'Hide left sidebar' : 'Show left sidebar'}
+          >
+            {sidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+            <span>{sidebarOpen ? 'Hide Nav' : 'Show Nav'}</span>
+          </button>
+          <button
+            className="portal-desktop-toggle-btn"
+            onClick={() => setRightPanelOpen(v => !v)}
+            title={rightPanelOpen ? 'Hide right panel' : 'Show right panel'}
+          >
+            {rightPanelOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
+            <span>{rightPanelOpen ? 'Hide Panel' : 'Show Panel'}</span>
+          </button>
+        </div>
+        <div style={{ padding: '12px 52px 48px' }}>{renderContent()}</div>
+      </div>
 
       {/* RIGHT PANEL */}
-      <div className="print-hide" style={{ width: 264, background: T.sidebarBg, borderLeft: `1px solid ${T.border}`, padding: '28px 20px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 24, position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
+      {rightPanelOpen && <div className="portal-right-panel print-hide" style={{ width: 264, background: T.sidebarBg, borderLeft: `1px solid ${T.border}`, padding: '28px 20px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 24, position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
         <div style={{ textAlign: 'center', paddingBottom: 20, borderBottom: `1px solid ${T.borderLight}` }}>
           <div style={{ width: 64, height: 64, borderRadius: '50%', background: rgba(accent, 0.1), border: `2px solid ${rgba(accent, 0.3)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 26, color: accent }}>{(config.name || 'A').charAt(0)}</div>
           <p style={{ margin: '0 0 4px', fontWeight: 700, color: T.text, fontSize: 15 }}>{config.name || 'Admin'}</p>
@@ -956,7 +1004,7 @@ export default function AdminDashboard() {
             <span style={{ fontFamily: 'monospace', fontSize: 13, color: T.muted }}>{accent.toUpperCase()}</span>
           </div>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

@@ -1,69 +1,104 @@
 import React from 'react';
-import { Settings, Upload, Users, Zap } from 'lucide-react';
+import { ArrowRight, Check } from 'lucide-react';
 
 const steps = [
   {
     num: '01',
-    icon: <Settings size={20} />,
-    title: 'Configure your school',
-    desc: 'Set up your school profile, academic calendar, class structure, and fee schedules. Our onboarding team guides you through every step.',
+    stepLabel: 'Step 01 — Zero-Friction Setup',
+    title: 'School structure & coefficient configuration',
+    desc: 'Input your school profile, academic terms, streams (Anglophone GCE / Francophone BEPC & Bac), subject coefficients, and grading scales in under 15 minutes. Our regional onboarding specialists assist with roster CSV imports.',
+    details: [
+      'Import student rosters and previous term archives in 1 click',
+      'Preset MINESEC and West African curriculum templates',
+      'Automatic generation of staff accounts with role-based access'
+    ]
   },
   {
     num: '02',
-    icon: <Upload size={20} />,
-    title: 'Import your data',
-    desc: 'Migrate existing student records, staff information, and historical data securely. We support CSV imports and direct integrations.',
+    stepLabel: 'Step 02 — Seamless Mark Entry',
+    title: 'Teachers input continuous assessment & exam scores',
+    desc: 'Educators use a rapid, keyboard-first digital mark sheet designed to work smoothly even on low-bandwidth connections. Raw marks for Sequences 1 through 6 and Mock/Official exams are logged with instant validation.',
+    details: [
+      'Keyboard arrow navigation for ultra-fast score input',
+      'Offline-first caching prevents data loss during power cuts',
+      'Automated highlight of missing entries and score anomalies'
+    ]
   },
   {
     num: '03',
-    icon: <Users size={20} />,
-    title: 'Invite your team',
-    desc: 'Send role-specific invitations to administrators, teachers, and support staff. Each person gets a tailored experience.',
+    stepLabel: 'Step 03 — Instantaneous Computation',
+    title: 'The engine calculates weighted averages & class ranks',
+    desc: 'Eliminate human error entirely. The system calculates exact weighted averages multiplied by subject coefficients, establishes class general averages, determines honors/probation, and assigns precise rankings.',
+    details: [
+      '100% compliant with coefficient weighting rules',
+      'Automated tie-breaking and rank re-indexing',
+      'Subject teacher comment generation with AI assistance'
+    ]
   },
   {
     num: '04',
-    icon: <Zap size={20} />,
-    title: 'Go live',
-    desc: 'Launch EDUVANCE across your school. Parents and students get access within minutes. Real support from real people, always.',
+    stepLabel: 'Step 04 — Distribution & Visibility',
+    title: 'Parents receive bilingual report cards via portal and SMS',
+    desc: 'Generate official, tamper-proof PDF report cards in bulk with school crest, principal signature watermark, and QR verification. Parents receive instant notification and access via their dedicated portal.',
+    details: [
+      '1-click batch PDF export for physical printing ceremonies',
+      'Instant SMS notifications to guardian phone numbers',
+      'Real-time student progress tracking throughout the year'
+    ]
   },
 ];
 
 const HowItWorks = () => {
   return (
-    <section className="how-section" style={{ position: 'relative', overflow: 'hidden' }}>
-      {/* Premium emerald glow — bottom right */}
-      <div style={{
-        position: 'absolute', bottom: '-100px', right: '-100px',
-        width: '480px', height: '480px', borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(16,185,129,0.07) 0%, transparent 70%)',
-        pointerEvents: 'none',
-      }} aria-hidden="true" />
-
+    <section className="how-section" id="how-it-works">
       <div className="container">
-        <div
-          className="section-header reveal"
-          style={{ textAlign: "center", maxWidth: "800px", margin: "0 auto 56px" }}
-        >
-          <p className="section-eyebrow">Getting Started</p>
-          <h2 className="section-title">Up and running in days,<br />not months</h2>
-          <p className="section-body">
-            No lengthy implementation projects, no consultants required. Our streamlined
-            onboarding gets your entire school live in days.
-          </p>
-        </div>
+        <div className="how-layout">
+          {/* Left Column: Sticky Header */}
+          <div className="how-sticky-header reveal">
+            <span className="eyebrow">The 4-Step Workflow</span>
+            <h2 className="section-headline">
+              From raw marks<br />
+              to certified reports<br />
+              in four seamless steps
+            </h2>
+            <p className="section-sub" style={{ marginBottom: '36px' }}>
+              Designed to eliminate weeks of spreadsheet fatigue and give school leaders
+              unshakable confidence before every Parent-Teacher Assembly.
+            </p>
+            <a href="/register" className="btn btn-primary">
+              Experience the workflow
+              <ArrowRight size={16} />
+            </a>
+          </div>
 
-        <div className="how-steps">
-          {steps.map((step, i) => (
-            <React.Fragment key={step.num}>
-              <div className={`how-step reveal ${i > 0 ? `reveal-delay-${Math.min(i, 3)}` : ''}`}>
-                <div className="step-number">{step.num}</div>
-                <div className="step-icon">{step.icon}</div>
-                <h3>{step.title}</h3>
-                <p>{step.desc}</p>
+          {/* Right Column: Vertical Timeline */}
+          <div className="timeline">
+            {steps.map((s, idx) => (
+              <div 
+                key={s.num} 
+                className={`timeline-item ${idx === 1 ? 'active' : ''} reveal reveal-delay-${idx + 1}`}
+              >
+                <div className="timeline-marker">
+                  <span className="timeline-marker-inner">{s.num}</span>
+                </div>
+                <div className="timeline-content">
+                  <div className="timeline-step-label">{s.stepLabel}</div>
+                  <h3>{s.title}</h3>
+                  <p>{s.desc}</p>
+                  <div className="timeline-detail">
+                    {s.details.map((d, di) => (
+                      <div key={di} className="timeline-detail-row">
+                        <div className="td-check">
+                          <Check size={11} strokeWidth={3} />
+                        </div>
+                        <span>{d}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-              {i < steps.length - 1 && <div className="how-connector"></div>}
-            </React.Fragment>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -71,4 +106,3 @@ const HowItWorks = () => {
 };
 
 export default HowItWorks;
-

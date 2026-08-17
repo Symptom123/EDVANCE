@@ -1,65 +1,83 @@
 import React from 'react';
+import { Star } from 'lucide-react';
 
 const testimonials = [
   {
     id: 'testi-1',
-    av: 'RT',
-    avCls: 'ta-1',
-    quote: '"EDUVANCE replaced five separate systems we were using. The ROI was evident within the first term — our administrative team saved over 20 hours per week."',
-    name: 'Dr. Rachel Thompson',
-    role: 'Principal, Pinnacle Academy — London',
+    av: 'EM',
+    avCls: 'av-1',
+    quote: '"Calculating coefficient averages for 1,400 students across 6 sequences used to paralyze our staff for two weeks every term. With Edvance, our entire report card generation process now takes under 45 minutes with zero mathematical errors."',
+    name: 'Prof. Emmanuel Mbassi',
+    role: 'Principal, Collège Jean-Tabi — Yaoundé',
+    school: 'Collège Jean-Tabi',
     featured: false,
   },
   {
     id: 'testi-2',
-    av: 'MO',
-    avCls: 'ta-2',
-    quote: '"I\'ve evaluated over 30 school management platforms. EDUVANCE is the only one that felt like it was built by people who actually understand how schools work. The depth of features combined with the quality of the interface is unmatched."',
-    name: 'Michael Okafor',
-    role: 'Director of Technology, BrightFuture District',
+    av: 'AK',
+    avCls: 'av-2',
+    quote: '"Edvance is the only school management system that genuinely respects the Cameroon GCE Board structure and MINESEC requirements out of the box. Teacher adoption was 100% within the first month because the interface makes their job easier, not harder."',
+    name: 'Dr. Agnes Kengne-Fosso',
+    role: 'Director of Academic Affairs, Saker Baptist College — Limbe',
+    school: 'Saker Baptist College',
     featured: true,
   },
   {
     id: 'testi-3',
-    av: 'SC',
-    avCls: 'ta-3',
-    quote: '"Parent engagement went up 60% after we launched the parent portal. Teachers love it. Admins love it. Even parents who aren\'t particularly tech-savvy figured it out immediately."',
-    name: 'Sarah Chen',
-    role: 'Head of Operations, Meridian Prep School',
+    av: 'BO',
+    avCls: 'av-3',
+    quote: '"The Parent Portal changed everything for our community. Parents receive attendance alerts and sequence marks immediately on their phones. Tuition fee collection friction dropped by 65% because receipts are tracked automatically."',
+    name: 'Rev. Bernard Orock',
+    role: 'Headmaster, St. Joseph\'s College — Sasse, Buea',
+    school: 'St. Joseph\'s College',
     featured: false,
   },
 ];
 
 const Testimonials = () => {
   return (
-    <section className="testimonials-section" id="customers" style={{ position: 'relative', overflow: 'hidden' }}>
-      {/* Premium blue glow — top left */}
-      <div style={{
-        position: 'absolute', top: '-80px', left: '-80px',
-        width: '500px', height: '500px', borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(16,185,129,0.07) 0%, transparent 70%)',
-        pointerEvents: 'none',
-      }} aria-hidden="true" />
-      <div className="container" style={{ position: 'relative', zIndex: 1 }}>
-        <div className="section-header reveal">
-          <p className="section-eyebrow">Customer Stories</p>
-          <h2 className="section-title">Trusted by school leaders<br />who demand excellence</h2>
+    <section className="testimonials-section" id="testimonials">
+      <div className="container">
+        <div className="testi-header reveal">
+          <span className="eyebrow">Institutional Endorsements</span>
+          <h2 className="section-headline">
+            Trusted by the principals<br />
+            shaping Africa's future
+          </h2>
+          <p className="section-sub">
+            Leading academic institutions rely on Edvance to manage examinations, 
+            faculty workflows, and parent engagement with uncompromising reliability.
+          </p>
         </div>
 
-        <div className="testimonials-grid">
-          {testimonials.map((t, i) => (
-            <div
-              key={t.id}
-              id={t.id}
-              className={`testimonial-card ${t.featured ? 'testi-featured' : ''} reveal ${i === 1 ? '' : i === 2 ? '' : ''}`}
+        <div className="testi-grid">
+          {testimonials.map((t, idx) => (
+            <div 
+              key={t.id} 
+              className={`testi-card spotlight-card ${t.featured ? 'featured' : ''} reveal reveal-delay-${idx + 1}`}
             >
-              <div className="testi-rating">★★★★★</div>
-              <p className="testi-quote">{t.quote}</p>
+              <div className="testi-stars">
+                {[...Array(5)].map((_, s) => (
+                  <Star 
+                    key={s} 
+                    size={15} 
+                    fill="#c9a96e" 
+                    color="#c9a96e" 
+                  />
+                ))}
+              </div>
+
+              <blockquote className="testi-quote">
+                {t.quote}
+              </blockquote>
+
               <div className="testi-author">
-                <div className={`testi-av ${t.avCls}`}>{t.av}</div>
+                <div className={`testi-avatar ${t.avCls}`}>
+                  {t.av}
+                </div>
                 <div>
-                  <p className="testi-name">{t.name}</p>
-                  <p className="testi-role">{t.role}</p>
+                  <div className="testi-name">{t.name}</div>
+                  <div className="testi-role">{t.role}</div>
                 </div>
               </div>
             </div>
@@ -71,4 +89,3 @@ const Testimonials = () => {
 };
 
 export default Testimonials;
-

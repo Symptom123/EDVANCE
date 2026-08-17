@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, CheckSquare, Award, Mail, LogOut, FileText, Send, X, Plus } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, Award, Mail, LogOut, FileText, Send, X, Plus, User, Menu, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { T, rgba, navItemStyle, cardStyle, badge, inputStyle, btnStyle } from '../styles/portalTheme';
 
 export default function ParentPortal() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [config, setConfig] = useState(null);
   
   const [children, setChildren] = useState([]);
@@ -161,7 +163,13 @@ export default function ParentPortal() {
     finally { setSendingMessage(false); }
   };
 
-  if (!config) return null;
+  if (!config) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, background: '#f5f4f0' }}>
+      <div style={{ width: 40, height: 40, border: '4px solid #e5e7eb', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }}/>
+      <p style={{ color: '#9ca3af', fontSize: 14, fontFamily: 'system-ui' }}>Loading your portal...</p>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
   const accent = config.primaryColor || '#2563eb';
   const name = config.name || 'Parent';
 
@@ -186,8 +194,12 @@ export default function ParentPortal() {
         {loadingDashboard ? <p style={{ color: T.muted }}>Loading dashboard...</p> : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             {[
-              { label: "Child's Attendance", value: 'See Tab', color: '#059669' }, 
-              { label: 'Current GPA', value: dashboardData.avgScore?.toFixed(1) || '0', color: accent }, 
+              { 
+                label: "Child's Attendance", 
+                value: attendance.length > 0 ? `${Math.round((attendance.filter(a => String(a.status).toLowerCase() === 'present' || String(a.status).toLowerCase() === 'late').length / attendance.length) * 100)}%` : 'No Record', 
+                color: '#059669' 
+              }, 
+              { label: 'Current GPA', value: `${Number(dashboardData.avgScore || 0).toFixed(1)}/20`, color: accent }, 
               { label: 'Classes', value: dashboardData.classes || '0', color: '#d97706' }
             ].map(s => (
               <div key={s.label} style={{ ...cardStyle, borderTop: `3px solid ${s.color}` }}>
@@ -364,61 +376,86 @@ export default function ParentPortal() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: T.pageBg, fontFamily: T.fontSans }}>
-      <div style={{ width: 252, background: T.sidebarBg, borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 0, height: '100vh' }}>
+
+      {/* MOBILE HEADER */}
+      <div className="portal-mobile-header print-hide">
+        <button className="portal-mobile-menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle navigation">
+          {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+        <img src="/logo.png" alt="Edvance Logo" style={{ height: 28, objectFit: 'contain' }} />
+        <span className="portal-mobile-role-badge">Parent</span>
+      </div>
+
+      {sidebarOpen && <div
+        className={`portal-sidebar print-hide portal-sidebar--open`}
+        style={{ width: 256, background: T.sidebarBg, borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 0, height: '100vh' }}
+      >
+        <button className="portal-sidebar-overlay-close" onClick={() => setSidebarOpen(false)} aria-label="Close menu">✕</button>
+
         <div style={{ padding: '24px 20px', borderBottom: `1px solid ${T.borderLight}` }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <img src="/logo.png" alt="Edvance Logo" style={{ height: 48, objectFit: 'contain', alignSelf: 'flex-start' }} />
             <span style={{ fontSize: 11, color: T.light, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Parent Portal</span>
           </div>
         </div>
+
+        {/* Child selector */}
+        {children.length > 0 && (
+          <div style={{ padding: '12px 12px', borderBottom: `1px solid ${T.borderLight}` }}>
+            <p style={{ margin: '0 0 8px', fontSize: 11, color: T.muted, fontWeight: 600, textTransform: 'uppercase' }}>Child</p>
+            {children.map(c => (
+              <button key={c.id} onClick={() => { setSelectedChild(c); setSidebarOpen(false); }} style={{ ...navItemStyle(selectedChild?.id === c.id, accent), marginBottom: 2 }}>
+                <User size={14} />{c.name}
+              </button>
+            ))}
+          </div>
+        )}
+
         <nav style={{ flex: 1, padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {navItems.map(item => <button key={item.id} onClick={() => setActiveTab(item.id)} style={navItemStyle(activeTab === item.id, accent)}><item.icon size={16} />{item.label}</button>)}
+          {navItems.map(item => (
+            <button key={item.id} onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }} style={navItemStyle(activeTab === item.id, accent)}>
+              <item.icon size={16} />{item.label}
+            </button>
+          ))}
         </nav>
         <div style={{ padding: '12px 10px', borderTop: `1px solid ${T.borderLight}` }}>
           <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444'), color: '#ef4444' }}><LogOut size={16} />Sign Out</button>
         </div>
-      </div>
-      <div style={{ flex: 1, padding: '44px 52px', overflowY: 'auto' }}>{renderContent()}</div>
-      <div style={{ width: 280, background: T.sidebarBg, borderLeft: `1px solid ${T.border}`, padding: '24px 18px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 22, position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
-        <div style={{ textAlign: 'center', paddingBottom: 18, borderBottom: `1px solid ${T.borderLight}` }}>
-          <div style={{ width: 60, height: 60, borderRadius: '50%', background: rgba(accent, 0.1), border: `2px solid ${rgba(accent, 0.25)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 24, color: accent }}>{name.charAt(0)}</div>
-          <p style={{ margin: '0 0 4px', fontWeight: 700, color: T.text, fontSize: 14 }}>{name}</p>
-          <span style={badge(accent, rgba(accent, 0.1))}>Parent</span>
-        </div>
+      </div>}
+      {sidebarOpen && <div className="portal-sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
-        <div>
-          <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '1px' }}>Your Children</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {children.length === 0 ? (
-              <p style={{ color: T.muted, fontSize: 13 }}>No children linked yet.</p>
-            ) : children.map(child => (
-              <div key={child.ID} onClick={() => setSelectedChild(child)} style={{ ...cardStyle, background: selectedChild?.ID === child.ID ? '#faf9f7' : T.white, padding: '12px', border: `1.5px solid ${selectedChild?.ID === child.ID ? rgba(accent, 0.4) : T.borderLight}`, boxShadow: selectedChild?.ID === child.ID ? `0 2px 8px ${rgba(accent, 0.05)}` : 'none', cursor: 'pointer', transition: 'all 0.15s' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: accent, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 16 }}>{child.name.charAt(0)}</div>
-                  <div style={{ overflow: 'hidden' }}>
-                    <p style={{ margin: 0, fontWeight: 700, fontSize: 13, color: T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{child.name}</p>
-                    <p style={{ margin: 0, fontSize: 11, color: T.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{child.schoolName}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
+      {/* MAIN */}
+      <div className="print-main portal-main-content" style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
+        <div className="portal-desktop-toolbar print-hide">
+          <button className="portal-desktop-toggle-btn" onClick={() => setSidebarOpen(v => !v)} title={sidebarOpen ? 'Hide left sidebar' : 'Show left sidebar'}>
+            {sidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+            <span>{sidebarOpen ? 'Hide Nav' : 'Show Nav'}</span>
+          </button>
+          <button className="portal-desktop-toggle-btn" onClick={() => setRightPanelOpen(v => !v)} title={rightPanelOpen ? 'Hide right panel' : 'Show right panel'}>
+            {rightPanelOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
+            <span>{rightPanelOpen ? 'Hide Panel' : 'Show Panel'}</span>
+          </button>
+        </div>
+        <div style={{ padding: '12px 52px 48px' }}>{renderContent()}</div>
+      </div>
+
+      {rightPanelOpen && <div className="portal-right-panel print-hide" style={{ width: 256, background: T.sidebarBg, borderLeft: `1px solid ${T.border}`, padding: '24px 18px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 20, position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
+        <div style={{ textAlign: 'center', paddingBottom: 16, borderBottom: `1px solid ${T.borderLight}` }}>
+          <div style={{ width: 56, height: 56, borderRadius: '50%', background: rgba(accent, 0.1), border: `2px solid ${rgba(accent, 0.25)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 22, color: accent }}>{name.charAt(0)}</div>
+          <p style={{ margin: '0 0 2px', fontWeight: 700, color: T.text, fontSize: 14 }}>{name}</p>
+          <span style={badge(accent, rgba(accent, 0.1))}>Guardian</span>
+        </div>
+        {selectedChild && (
+          <div>
+            <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '1px' }}>Viewing</p>
+            <div style={{ padding: '10px 12px', background: rgba(accent, 0.06), borderRadius: 8, border: `1px solid ${rgba(accent, 0.15)}` }}>
+              <p style={{ margin: 0, fontWeight: 600, color: T.text, fontSize: 13 }}>{selectedChild.name}</p>
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: T.muted }}>{selectedChild.class_name || 'Student'}</p>
+            </div>
           </div>
-        </div>
-
-        <div style={{ paddingTop: 18, borderTop: `1px solid ${T.borderLight}` }}>
-          <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '1px' }}>Link Another Child</p>
-          {linkSuccess ? (
-            <div style={{ padding: 12, background: '#f0fdf4', color: '#15803d', fontSize: 12, borderRadius: 8, fontWeight: 500 }}>{linkSuccess}</div>
-          ) : (
-            <form onSubmit={handleLinkChild} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <input type="email" required value={linkChildEmail} onChange={e => setLinkChildEmail(e.target.value)} placeholder="Child's Temp Email" style={{ ...inputStyle, padding: '8px 12px', fontSize: 12 }} />
-              <input type="text" required value={linkChildPass} onChange={e => setLinkChildPass(e.target.value)} placeholder="Temp Password" style={{ ...inputStyle, padding: '8px 12px', fontSize: 12 }} />
-              {linkError && <p style={{ color: '#ef4444', fontSize: 11, margin: 0 }}>⚠️ {linkError}</p>}
-              <button type="submit" disabled={isLinking} style={{ ...btnStyle(accent), padding: '8px', fontSize: 12 }}>{isLinking ? 'Linking...' : 'Link Child'}</button>
-            </form>
-          )}
-        </div>
-      </div>
+        )}
+      </div>}
     </div>
   );
 }
+

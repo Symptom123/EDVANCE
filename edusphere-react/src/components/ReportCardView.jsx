@@ -122,7 +122,16 @@ export default function ReportCardView({ reportCards, accent, config, isEditing,
 
       <div>
         {reportCards.map((rc, index) => {
-          const avg = rc.average || 0;
+          // Support both old CameroonReportCard and new ReportCardFull shapes
+          const avg = rc.termAverage ?? rc.average ?? 0;
+          const totalStudents = rc.totalStudents ?? rc.classSize ?? '-';
+          const promotionStatus = rc.promotionStatus ?? (avg >= 10 ? 'Promoted' : 'Not Promoted');
+          const principalRemark = rc.principalRemark ?? (avg >= 16 ? 'Excellent work, keep it up.' : avg >= 10 ? 'Satisfactory performance.' : 'Requires serious improvement.');
+          const classAvg = rc.classAverage ?? 0;
+          const highestAvg = rc.highestAverage ?? 0;
+          const lowestAvg = rc.lowestAverage ?? 0;
+          const totalScore = rc.totalScore ?? null;
+          const totalCoeff = rc.totalCoeff ?? null;
           const { grade: overallGrade, app: overallApp, color: overallColor } = getGradeInfo(avg);
           const isLast = index === reportCards.length - 1;
 
@@ -188,7 +197,7 @@ export default function ReportCardView({ reportCards, accent, config, isEditing,
                       }
                     </span>
                   </div>
-                  <div className="rc-info-row"><span className="rc-info-label">Class Size / Effectif:</span> <span>{rc.classSize || '-'}</span></div>
+                  <div className="rc-info-row"><span className="rc-info-label">Class Size / Effectif:</span> <span>{totalStudents}</span></div>
                   <div className="rc-info-row">
                     <span className="rc-info-label">Class Master:</span>
                     <span>
@@ -220,13 +229,16 @@ export default function ReportCardView({ reportCards, accent, config, isEditing,
                 <tbody>
                   {rc.subjects && rc.subjects.length > 0 ? rc.subjects.map((sub, i) => {
                     const coef = sub.coefficient || 1;
-                    const seq1 = sub.seq1Mark !== undefined ? Number(sub.seq1Mark).toFixed(2) : '-';
-                    const seq2 = sub.seq2Mark !== undefined ? Number(sub.seq2Mark).toFixed(2) : '-';
-                    const avgMark = sub.termAverage !== undefined ? Number(sub.termAverage) : 0;
-                    const total = sub.weightedScore !== undefined ? Number(sub.weightedScore) : (avgMark * coef);
-                    const grade = sub.grade || '-';
+                    // Support both old (seq1Mark/termAverage/weightedScore) and new (sequence1/subjectAvg) shapes
+                    const seq1Raw = sub.sequence1 ?? sub.seq1Mark;
+                    const seq2Raw = sub.sequence2 ?? sub.seq2Mark;
+                    const seq1 = seq1Raw != null ? Number(seq1Raw).toFixed(2) : '-';
+                    const seq2 = seq2Raw != null ? Number(seq2Raw).toFixed(2) : '-';
+                    const avgMark = sub.subjectAvg ?? sub.termAverage ?? 0;
+                    const total = sub.weightedScore != null ? Number(sub.weightedScore) : (avgMark > 0 ? avgMark * coef : null);
+                    const { grade, color: gradeColor } = getGradeInfo(avgMark);
                     const rank = sub.subjectRank || '-';
-                    const color = overallColor; // We could color code based on getGradeInfo(avgMark)
+                    const teacher = sub.teacherName || '-';
                     
                     return (
                       <tr key={i}>
@@ -234,11 +246,11 @@ export default function ReportCardView({ reportCards, accent, config, isEditing,
                         <td style={{ fontWeight: 'bold' }}>{coef}</td>
                         <td>{seq1}</td>
                         <td>{seq2}</td>
-                        <td style={{ fontWeight: 'bold', fontSize: 13, background: '#f8fafc' }}>{avgMark.toFixed(2)}</td>
-                        <td style={{ fontWeight: 'bold' }}>{total.toFixed(2)}</td>
-                        <td><strong style={{ color }}>{grade}</strong></td>
+                        <td style={{ fontWeight: 'bold', fontSize: 13, background: '#f8fafc', color: avgMark > 0 ? gradeColor : '#888' }}>{avgMark > 0 ? avgMark.toFixed(2) : '-'}</td>
+                        <td style={{ fontWeight: 'bold' }}>{total != null ? total.toFixed(2) : '-'}</td>
+                        <td><strong style={{ color: gradeColor }}>{grade}</strong></td>
                         <td>{rank}</td>
-                        <td style={{ fontSize: 11, color: '#555' }}>{sub.teacherName || '-'}</td>
+                        <td style={{ fontSize: 11, color: '#555' }}>{teacher}</td>
                       </tr>
                     );
                   }) : (
@@ -254,11 +266,11 @@ export default function ReportCardView({ reportCards, accent, config, isEditing,
               {/* ── SUMMARY BOX ── */}
               <div className="rc-summary">
                 <div className="rc-summary-stat">
-                  <span className="val">{rc.totalScore != null ? Number(rc.totalScore).toFixed(1) : '-'}</span>
+                  <span className="val">{totalScore != null ? Number(totalScore).toFixed(1) : '-'}</span>
                   <span className="lbl">Total Marks</span>
                 </div>
                 <div className="rc-summary-stat">
-                  <span className="val">{rc.totalCoeff || '-'}</span>
+                  <span className="val">{totalCoeff ?? '-'}</span>
                   <span className="lbl">Total Coef</span>
                 </div>
                 <div className="rc-summary-stat">
@@ -266,7 +278,7 @@ export default function ReportCardView({ reportCards, accent, config, isEditing,
                   <span className="lbl">Term Average</span>
                 </div>
                 <div className="rc-summary-stat">
-                  <span className="val">{rc.rank || '-'}{rc.classSize ? `/${rc.classSize}` : ''}</span>
+                  <span className="val">{rc.rank || '-'}{totalStudents ? `/${totalStudents}` : ''}</span>
                   <span className="lbl">Class Rank</span>
                 </div>
                 <div className="rc-summary-stat">
@@ -278,16 +290,16 @@ export default function ReportCardView({ reportCards, accent, config, isEditing,
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 14 }}>
                 <div style={{ border: '1px solid #ccc', padding: 8, fontSize: 12, background: '#fafafa' }}>
                   <p style={{ margin: '0 0 4px', fontWeight: 'bold' }}>Class Statistics</p>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Class Average:</span> <strong>{rc.classAverage ? rc.classAverage.toFixed(2) : '-'}</strong></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Highest Average:</span> <strong>{rc.highestAverage ? rc.highestAverage.toFixed(2) : '-'}</strong></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Lowest Average:</span> <strong>{rc.lowestAverage ? rc.lowestAverage.toFixed(2) : '-'}</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Class Average:</span> <strong>{classAvg > 0 ? classAvg.toFixed(2) : '-'}</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Highest Average:</span> <strong>{highestAvg > 0 ? highestAvg.toFixed(2) : '-'}</strong></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Lowest Average:</span> <strong>{lowestAvg > 0 ? lowestAvg.toFixed(2) : '-'}</strong></div>
                 </div>
                 <div style={{ border: '1px solid #ccc', padding: 8, fontSize: 12, background: '#fafafa' }}>
                   <p style={{ margin: '0 0 4px', fontWeight: 'bold' }}>Promotion / Decision</p>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: rc.promotionStatus === 'Promoted' ? '#15803d' : '#dc2626' }}>
-                    <span style={{ fontWeight: 'bold', fontSize: 16 }}>{rc.promotionStatus || 'Pending Decision'}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: promotionStatus === 'Promoted' ? '#15803d' : '#dc2626' }}>
+                    <span style={{ fontWeight: 'bold', fontSize: 16 }}>{promotionStatus}</span>
                   </div>
-                  <p style={{ margin: '4px 0 0', fontStyle: 'italic', color: '#555' }}>{rc.principalRemark || overallApp}</p>
+                  <p style={{ margin: '4px 0 0', fontStyle: 'italic', color: '#555' }}>{principalRemark}</p>
                 </div>
               </div>
 
@@ -295,7 +307,7 @@ export default function ReportCardView({ reportCards, accent, config, isEditing,
               <div style={{ marginBottom: 12, fontSize: 12 }}>
                 <strong>Remarks / Observations:</strong>
                 <div className="rc-remarks" style={{ marginTop: 4 }}>
-                  {rc.principalRemark || overallApp}
+                  {principalRemark || overallApp}
                 </div>
               </div>
 
