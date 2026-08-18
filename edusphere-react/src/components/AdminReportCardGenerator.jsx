@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Download, FileText, CheckCircle2, AlertCircle, Loader2, Printer } from 'lucide-react';
-import html2pdf from 'html2pdf.js';
+import html2pdf from 'html2pdf.js/dist/html2pdf.js';
 import { T, cardStyle, inputStyle, btnStyle } from '../styles/portalTheme';
 import ReportCardView from './ReportCardView';
 import ReportCardControls from './ReportCardControls';
