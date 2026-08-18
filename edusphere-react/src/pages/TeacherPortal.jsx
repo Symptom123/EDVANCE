@@ -95,7 +95,7 @@ export default function TeacherPortal() {
     const sid = config.schoolId || '';
     
     // Fetch dashboard
-    fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/teacher/${tid}?schoolId=${sid}`)
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/dashboard/teacher/${tid}?schoolId=${sid}`)
       .then(r => r.json())
       .then(d => {
         setDashData(d || { classes: 0, students: 0, avgScore: 0, chartData: [] });
@@ -103,7 +103,7 @@ export default function TeacherPortal() {
       }).catch(() => setDashLoading(false));
 
     // Fetch classes
-    fetch(`${import.meta.env.VITE_API_URL}/api/classes?schoolId=${sid}`)
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/classes?schoolId=${sid}`)
       .then(r => r.json())
       .then(c => {
         const mine = (c || []).filter(cls => !cls.teacherId || cls.teacherId === tid || cls.teacherId === config.name || String(cls.teacherId) === String(tid));
@@ -117,19 +117,19 @@ export default function TeacherPortal() {
       });
 
     // Fetch sequences
-    fetch(`${import.meta.env.VITE_API_URL}/api/sequences?schoolId=${config.schoolId}`)
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/sequences?schoolId=${config.schoolId}`)
       .then(r => r.json())
       .then(s => setSequences(s || []));
 
     // Fetch users for messages
-    fetch(`${import.meta.env.VITE_API_URL}/api/users?schoolId=${config.schoolId}`)
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/users?schoolId=${config.schoolId}`)
       .then(r => r.json())
       .then(u => {
         setMsgUsers((u || []).filter(user => user.id !== config.id));
       });
 
     // Fetch all students for class enrollment management
-    fetch(`${import.meta.env.VITE_API_URL}/api/users?schoolId=${config.schoolId}&role=Student`)
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/users?schoolId=${config.schoolId}&role=Student`)
       .then(r => r.json())
       .then(s => setAllSchoolStudents(s || []));
 
@@ -141,8 +141,8 @@ export default function TeacherPortal() {
     setAttLoading(true);
     
     Promise.all([
-      fetch(`${import.meta.env.VITE_API_URL}/api/enrollments?schoolId=${config.schoolId}&classId=${attClassId}`).then(r => r.json()),
-      fetch(`${import.meta.env.VITE_API_URL}/api/attendance?schoolId=${config.schoolId}&classId=${attClassId}&date=${attDate}`).then(r => r.json())
+      fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/enrollments?schoolId=${config.schoolId}&classId=${attClassId}`).then(r => r.json()),
+      fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/attendance?schoolId=${config.schoolId}&classId=${attClassId}&date=${attDate}`).then(r => r.json())
     ]).then(([enr, att]) => {
       setAttStudents(enr || []);
       const attMap = {};
@@ -164,7 +164,7 @@ export default function TeacherPortal() {
   const handleSaveAttendance = () => {
     setAttSuccess('');
     const tid = config.id || config.userId || '';
-    fetch(`${import.meta.env.VITE_API_URL}/api/attendance`, {
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/attendance`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -191,8 +191,8 @@ export default function TeacherPortal() {
     setGradLoading(true);
 
     Promise.all([
-      fetch(`${import.meta.env.VITE_API_URL}/api/enrollments?schoolId=${config.schoolId}&classId=${gradingClassId}`).then(r => r.json()),
-      fetch(`${import.meta.env.VITE_API_URL}/api/marks?schoolId=${config.schoolId}&classId=${gradingClassId}&sequenceId=${gradingSequenceId}`).then(r => r.json())
+      fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/enrollments?schoolId=${config.schoolId}&classId=${gradingClassId}`).then(r => r.json()),
+      fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/marks?schoolId=${config.schoolId}&classId=${gradingClassId}&sequenceId=${gradingSequenceId}`).then(r => r.json())
     ]).then(([enr, marksData]) => {
       setGradStudents(enr || []);
       const m = {};
@@ -212,7 +212,7 @@ export default function TeacherPortal() {
       const score = marks[s.studentId];
       if (score === undefined || score === '') return Promise.resolve();
       
-      return fetch(`${import.meta.env.VITE_API_URL}/api/marks`, {
+      return fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/marks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -272,7 +272,7 @@ export default function TeacherPortal() {
   const fetchAssignments = () => {
     if (!assignClassId) return;
     setAssignLoading(true);
-    fetch(`${import.meta.env.VITE_API_URL}/api/assignments?schoolId=${config.schoolId}&classId=${assignClassId}`)
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/assignments?schoolId=${config.schoolId}&classId=${assignClassId}`)
       .then(r => r.json())
       .then(d => { setAssignments(d || []); setAssignLoading(false); })
       .catch(() => setAssignLoading(false));
@@ -284,7 +284,7 @@ export default function TeacherPortal() {
   const handleCreateAssignment = (e) => {
     e.preventDefault();
     const tid = config.id || config.userId || '';
-    fetch(`${import.meta.env.VITE_API_URL}/api/assignments`, {
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/assignments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -317,7 +317,7 @@ export default function TeacherPortal() {
     setSelectedAssignForGrading(assign);
     setSubmissionsLoading(true);
     setAssignSuccess('');
-    fetch(`${import.meta.env.VITE_API_URL}/api/assignments/${assign.id || assign.ID}/submissions`)
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/assignments/${assign.id || assign.ID}/submissions`)
       .then(r => r.json())
       .then(d => {
         setSubmissions(Array.isArray(d) ? d : []);
@@ -328,7 +328,7 @@ export default function TeacherPortal() {
 
   const handleSaveGrade = (submissionId, gradeVal, feedbackVal) => {
     setSaveGradeLoading(true);
-    fetch(`${import.meta.env.VITE_API_URL}/api/assignments/submissions/${submissionId}/grade`, {
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/assignments/submissions/${submissionId}/grade`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -350,7 +350,7 @@ export default function TeacherPortal() {
   // Handle Announcements tab
   const fetchAnnouncements = () => {
     setAnnLoading(true);
-    fetch(`${import.meta.env.VITE_API_URL}/api/announcements?schoolId=${config.schoolId}`)
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/announcements?schoolId=${config.schoolId}`)
       .then(r => r.json())
       .then(d => { setAnnouncements(d || []); setAnnLoading(false); })
       .catch(() => setAnnLoading(false));
@@ -361,7 +361,7 @@ export default function TeacherPortal() {
 
   const handleCreateAnnouncement = () => {
     if (!annText.trim() || !annClassId) return;
-    fetch(`${import.meta.env.VITE_API_URL}/api/announcements`, {
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/announcements`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -380,14 +380,14 @@ export default function TeacherPortal() {
   };
 
   const handleDeleteAnnouncement = (id) => {
-    fetch(`${import.meta.env.VITE_API_URL}/api/announcements/${id}`, { method: 'DELETE' })
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/announcements/${id}`, { method: 'DELETE' })
       .then(r => { if(r.ok) fetchAnnouncements(); });
   };
 
   // Handle Messages tab
   const fetchMessages = () => {
     setMsgLoading(true);
-    fetch(`${import.meta.env.VITE_API_URL}/api/messages?userId=${config.id}&box=inbox`)
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/messages?userId=${config.id}&box=inbox`)
       .then(r => r.json())
       .then(d => { setMessages(d || []); setMsgLoading(false); })
       .catch(() => setMsgLoading(false));
@@ -398,14 +398,14 @@ export default function TeacherPortal() {
 
   const handleReadMessage = (msg) => {
     if (!msg.isRead) {
-      fetch(`${import.meta.env.VITE_API_URL}/api/messages/${msg.id || msg.ID}/read`, { method: 'PUT' })
+      fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/messages/${msg.id || msg.ID}/read`, { method: 'PUT' })
         .then(() => fetchMessages());
     }
   };
 
   const handleSendMessage = (e) => {
     e.preventDefault();
-    fetch(`${import.meta.env.VITE_API_URL}/api/messages`, {
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -776,7 +776,7 @@ export default function TeacherPortal() {
                   </button>
                   <button onClick={() => {
                     if (window.confirm('Delete this assignment?')) {
-                      fetch(`${import.meta.env.VITE_API_URL}/api/assignments/${a.id || a.ID}`, { method: 'DELETE' }).then(() => fetchAssignments());
+                      fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/assignments/${a.id || a.ID}`, { method: 'DELETE' }).then(() => fetchAssignments());
                     }
                   }} style={{ ...btnStyle('#ef4444', true), flex: 1, justifyContent: 'center', padding: '6px 8px', fontSize: 12 }}>
                     <Trash2 size={13}/> Delete
@@ -1105,7 +1105,7 @@ export default function TeacherPortal() {
   const fetchClassesAgain = () => {
     const tid = config?.id || config?.userId || '';
     const sid = config?.schoolId || '';
-    fetch(`${import.meta.env.VITE_API_URL}/api/classes?schoolId=${sid}`)
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/classes?schoolId=${sid}`)
       .then(r => r.json())
       .then(c => {
         const mine = (c || []).filter(cls => !cls.teacherId || cls.teacherId === tid || cls.teacherId === config.name || String(cls.teacherId) === String(tid));
@@ -1124,7 +1124,7 @@ export default function TeacherPortal() {
     setSelectedManageClass(cls);
     setRosterLoading(true);
     const classId = cls.id || cls.ID;
-    fetch(`${import.meta.env.VITE_API_URL}/api/enrollments?schoolId=${config.schoolId}&classId=${classId}`)
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/enrollments?schoolId=${config.schoolId}&classId=${classId}`)
       .then(r => r.json())
       .then(d => { setClassRoster(d || []); setRosterLoading(false); })
       .catch(() => setRosterLoading(false));
@@ -1133,7 +1133,7 @@ export default function TeacherPortal() {
   const handleAddStudentToClass = () => {
     if (!addRosterStudentId || !selectedManageClass) return;
     const classId = selectedManageClass.id || selectedManageClass.ID;
-    fetch(`${import.meta.env.VITE_API_URL}/api/enrollments`, {
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/enrollments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1152,7 +1152,7 @@ export default function TeacherPortal() {
   const handleRemoveStudentFromClass = (studentId) => {
     if (!selectedManageClass || !window.confirm('Remove student from this class?')) return;
     const classId = selectedManageClass.id || selectedManageClass.ID;
-    fetch(`${import.meta.env.VITE_API_URL}/api/enrollments?classId=${classId}&studentId=${studentId}`, {
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/enrollments?classId=${classId}&studentId=${studentId}`, {
       method: 'DELETE'
     }).then(r => {
       if (r.ok) {
@@ -1167,7 +1167,7 @@ export default function TeacherPortal() {
     setCreateClassLoading(true);
     setClassSuccess('');
     const tid = config.id || config.userId || '';
-    fetch(`${import.meta.env.VITE_API_URL}/api/classes`, {
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/classes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

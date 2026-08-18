@@ -13,7 +13,7 @@ import ReportCardView from '../components/ReportCardView';
 import AdminReportCardGenerator from '../components/AdminReportCardGenerator';
 import * as XLSX from 'xlsx';
 
-const API = import.meta.env.VITE_API_URL;
+const API = (import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '');
 
 export default function AdminDashboard() {
   const navigate = useNavigate();

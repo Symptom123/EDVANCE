@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Download, ExternalLink, FileText, Image as ImageIcon, ZoomIn, ZoomOut, RotateCw, Copy, Check, AlertCircle } from 'lucide-react';
 import { T, rgba, badge, btnStyle } from '../styles/portalTheme';
 
-const API_BASE = import.meta.env.VITE_API_URL;
+const API_BASE = (import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '');
 
 // ---------------------------------------------------------------
 // Helpers (exported so other components can use them)

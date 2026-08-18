@@ -56,7 +56,7 @@ const CreateSchool = () => {
         configJson: JSON.stringify({ roles: config.roles, modules: config.modules })
       };
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/schools`, {
+      const res = await fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/schools`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

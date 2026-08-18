@@ -40,7 +40,7 @@ export default function FileUploadDropzone({
         setProgress(p => (p < 85 ? p + 15 : p));
       }, 150);
 
-      const API = import.meta.env.VITE_API_URL;
+      const API = (import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '');
       const res = await fetch(`${API}/api/upload`, {
         method: 'POST',
         body: formData

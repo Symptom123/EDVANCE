@@ -48,7 +48,7 @@ export default function StudentPortal() {
   const [msgBody, setMsgBody] = useState('');
   const [msgSending, setMsgSending] = useState(false);
 
-  const API = import.meta.env.VITE_API_URL;
+  const API = (import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '');
 
   useEffect(() => {
     const raw = localStorage.getItem('edvance_school_config');

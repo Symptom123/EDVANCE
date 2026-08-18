@@ -44,7 +44,7 @@ export default function AdminReportCardGenerator({ config, accent }) {
 
   useEffect(() => {
     if (!config) return;
-    fetch(`${import.meta.env.VITE_API_URL}/api/classes?schoolId=${config.schoolId}`)
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/classes?schoolId=${config.schoolId}`)
       .then(r => r.json())
       .then(data => { if (Array.isArray(data)) setClasses(data); });
   }, [config]);
@@ -86,7 +86,7 @@ export default function AdminReportCardGenerator({ config, accent }) {
     setLoading(true);
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/report-cards/list?schoolId=${config.schoolId}&classId=${classId}&term=${term}&academicYear=${encodeURIComponent(academicYear)}`
+        `${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/report-cards/list?schoolId=${config.schoolId}&classId=${classId}&term=${term}&academicYear=${encodeURIComponent(academicYear)}`
       );
       const data = await res.json();
       // The list returns { id, studentId, studentName, termAverage, rank, status, data: ReportCardFull }
@@ -118,7 +118,7 @@ export default function AdminReportCardGenerator({ config, accent }) {
     setGenerating(true);
     setMessage({ text: '', type: '' });
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/report-cards/generate-bulk`, {
+      const res = await fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/report-cards/generate-bulk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -144,7 +144,7 @@ export default function AdminReportCardGenerator({ config, accent }) {
 
   const handlePublish = async (id) => {
     try {
-      await fetch(`${import.meta.env.VITE_API_URL}/api/report-cards/${id}/publish`, { method: 'PUT' });
+      await fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/report-cards/${id}/publish`, { method: 'PUT' });
       fetchReportCards();
     } catch (e) {
       console.error(e);

@@ -43,7 +43,7 @@ export default function ParentPortal() {
 
   const fetchChildren = async (parentId) => {
     try {
-      const API = import.meta.env.VITE_API_URL;
+      const API = (import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '');
       const res = await fetch(`${API}/api/parents/${parentId}/children`);
       const data = await res.json();
       setChildren(data || []);
@@ -56,7 +56,7 @@ export default function ParentPortal() {
   const fetchMessages = async (userId) => {
     try {
       setLoadingMessages(true);
-      const API = import.meta.env.VITE_API_URL;
+      const API = (import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '');
       const res = await fetch(`${API}/api/messages?userId=${userId}&box=inbox`);
       const data = await res.json();
       setMessages(data || []);
@@ -78,7 +78,7 @@ export default function ParentPortal() {
     if (!selectedChild) return;
     const fetchChildData = async () => {
       const { ID: studentId, schoolId } = selectedChild;
-      const API = import.meta.env.VITE_API_URL;
+      const API = (import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '');
       
       setLoadingDashboard(true);
       fetch(`${API}/api/dashboard/student/${studentId}?schoolId=${schoolId}`)
@@ -131,7 +131,7 @@ export default function ParentPortal() {
     e.preventDefault();
     setIsLinking(true); setLinkError(''); setLinkSuccess('');
     try {
-      const API = import.meta.env.VITE_API_URL;
+      const API = (import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '');
       const res = await fetch(`${API}/api/parents/link-child`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ parentId: config.userId, childEmail: linkChildEmail, childPass: linkChildPass })
@@ -150,7 +150,7 @@ export default function ParentPortal() {
 
   const markRead = async (msgId) => {
     try {
-      const API = import.meta.env.VITE_API_URL;
+      const API = (import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '');
       await fetch(`${API}/api/messages/${msgId}/read`, { method: 'PUT' });
       setMessages(msgs => msgs.map(m => m.id === msgId ? { ...m, read: true } : m));
     } catch(err) { console.error(err); }
@@ -161,7 +161,7 @@ export default function ParentPortal() {
     if (!composeRecip || !composeSubject || !composeBody) return;
     setSendingMessage(true);
     try {
-      const API = import.meta.env.VITE_API_URL;
+      const API = (import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '');
       const payload = {
         schoolId: selectedChild.schoolId,
         senderId: config.userId,
