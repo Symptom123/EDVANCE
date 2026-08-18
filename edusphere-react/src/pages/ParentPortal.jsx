@@ -7,7 +7,7 @@ import DocumentViewerModal, { triggerFileDownload, formatFileSize } from '../com
 export default function ParentPortal() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 860 : true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [config, setConfig] = useState(null);
   
@@ -592,7 +592,7 @@ export default function ParentPortal() {
             <span>{rightPanelOpen ? 'Hide Panel' : 'Show Panel'}</span>
           </button>
         </div>
-        <div style={{ padding: '12px 52px 48px' }}>{renderContent()}</div>
+        <div className="portal-inner-content">{renderContent()}</div>
       </div>
 
       {rightPanelOpen && <div className="portal-right-panel print-hide" style={{ width: 256, background: T.sidebarBg, borderLeft: `1px solid ${T.border}`, padding: '24px 18px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 20, position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>

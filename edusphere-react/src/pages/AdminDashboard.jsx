@@ -19,7 +19,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [config, setConfig] = useState(null);
   const [activeView, setActiveView] = useState('overview');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 860 : true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState([]);
@@ -977,7 +977,7 @@ export default function AdminDashboard() {
             <span>{rightPanelOpen ? 'Hide Panel' : 'Show Panel'}</span>
           </button>
         </div>
-        <div style={{ padding: '12px 52px 48px' }}>{renderContent()}</div>
+        <div className="portal-inner-content">{renderContent()}</div>
       </div>
 
       {/* RIGHT PANEL */}
