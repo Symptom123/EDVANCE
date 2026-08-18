@@ -1,12 +1,17 @@
 package main
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"mime"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -285,12 +290,33 @@ func migrateSchema() {
 		`ALTER TABLE attendance ADD COLUMN IF NOT EXISTS class_id VARCHAR(36) DEFAULT ''`,
 		`ALTER TABLE attendance ADD COLUMN IF NOT EXISTS teacher_id VARCHAR(36) DEFAULT ''`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_attendance_unique ON attendance(class_id, student_id, date)`,
+		`CREATE TABLE IF NOT EXISTS file_assets (
+			id VARCHAR(36) PRIMARY KEY,
+			bucket VARCHAR(64) DEFAULT 'assets',
+			key TEXT UNIQUE,
+			filename TEXT NOT NULL,
+			mime_type TEXT DEFAULT '',
+			size_bytes BIGINT DEFAULT 0,
+			storage_path TEXT DEFAULT '',
+			sha256_hash TEXT DEFAULT '',
+			data BYTEA,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`ALTER TABLE file_assets ADD COLUMN IF NOT EXISTS storage_path TEXT DEFAULT ''`,
+		`ALTER TABLE file_assets ADD COLUMN IF NOT EXISTS sha256_hash TEXT DEFAULT ''`,
 		`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS teacher_id VARCHAR(36) DEFAULT ''`,
 		`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS teacher_name TEXT DEFAULT ''`,
 		`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''`,
 		`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS due_date TEXT DEFAULT ''`,
 		`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS max_points REAL DEFAULT 20.0`,
 		`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT ''`,
+		`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS file_url TEXT DEFAULT ''`,
+		`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS file_name TEXT DEFAULT ''`,
+		`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS file_size BIGINT DEFAULT 0`,
+		`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS file_type TEXT DEFAULT ''`,
+		`ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS file_name TEXT DEFAULT ''`,
+		`ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS file_size BIGINT DEFAULT 0`,
+		`ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS file_type TEXT DEFAULT ''`,
 		`ALTER TABLE course_subjects ADD COLUMN IF NOT EXISTS teacher_id VARCHAR(36)`,
 		`ALTER TABLE marks_entry ADD COLUMN IF NOT EXISTS coefficient REAL DEFAULT 1.0`,
 		`ALTER TABLE schools ADD COLUMN IF NOT EXISTS subsystem TEXT DEFAULT 'anglophone'`,
@@ -639,6 +665,54 @@ func main() {
 	r.Get("/api/assignments/student-submissions", listStudentSubmissions)
 	r.Put("/api/assignments/submissions/{id}/grade", gradeAssignmentSubmission)
 
+	// File Upload & Asset Storage
+	r.Post("/api/upload", uploadFileHandler)
+	r.Get("/api/files/{id}", getFileHandler)
+	r.Get("/api/files/download/{id}", downloadFileHandler)
+
+	// Safe file serving for uploads directory (with CORS & Security Headers)
+	uploadDir := "./uploads"
+	_ = os.MkdirAll(uploadDir, 0755)
+	_ = os.MkdirAll(IsolatedStorageDir, 0700)
+	r.Get("/uploads/*", func(w http.ResponseWriter, r *http.Request) {
+		setSecurityHeaders(w)
+		param := chi.URLParam(r, "*")
+		safeParam := sanitizeFilename(param)
+		if safeParam == "" {
+			http.Error(w, "Invalid path", http.StatusBadRequest)
+			return
+		}
+		candidatePaths := []string{
+			filepath.Join("./uploads", safeParam),
+			filepath.Join(IsolatedStorageDir, fmt.Sprintf("%s.dat", safeParam)),
+		}
+		if strings.Contains(safeParam, "_") {
+			parts := strings.SplitN(safeParam, "_", 2)
+			candidatePaths = append(candidatePaths, filepath.Join(IsolatedStorageDir, fmt.Sprintf("%s.dat", parts[0])))
+		}
+		for _, p := range candidatePaths {
+			if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+				if f, err := os.Open(p); err == nil {
+					defer f.Close()
+					ext := strings.ToLower(filepath.Ext(safeParam))
+					if isDangerousFile(ext) {
+						w.Header().Set("Content-Type", "application/octet-stream")
+						w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", safeParam))
+					} else {
+						mimeType := mime.TypeByExtension(ext)
+						if mimeType == "" {
+							mimeType = "application/octet-stream"
+						}
+						w.Header().Set("Content-Type", mimeType)
+					}
+					http.ServeContent(w, r, safeParam, fi.ModTime(), f)
+					return
+				}
+			}
+		}
+		http.Error(w, "File not found", http.StatusNotFound)
+	})
+
 	// Messages
 	r.Get("/api/messages", listMessages)
 	r.Post("/api/messages", sendMessage)
@@ -688,10 +762,22 @@ func createSchool(w http.ResponseWriter, r *http.Request) {
 		Password: req.AdminPass, Role: "Admin", FirstLogin: false}
 
 	if isOnline() {
-		pgDB.Exec(`INSERT INTO schools(id,name,primary_color,has_primary,has_secondary,config_json,admin_id,features) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
-			school.ID, school.Name, school.PrimaryColor, school.HasPrimary, school.HasSecondary, school.ConfigJSON, school.AdminID, featuresJSON(school.Features))
-		pgDB.Exec(`INSERT INTO users(id,school_id,name,email,password,role,first_login) VALUES($1,$2,$3,$4,$5,$6,$7)`,
-			admin.ID, admin.SchoolID, admin.Name, admin.Email, admin.Password, admin.Role, admin.FirstLogin)
+		if _, err := pgDB.Exec(`INSERT INTO schools(id,name,primary_color,has_primary,has_secondary,config_json,admin_id,features) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+			school.ID, school.Name, school.PrimaryColor, school.HasPrimary, school.HasSecondary, school.ConfigJSON, school.AdminID, featuresJSON(school.Features)); err != nil {
+			log.Printf("[createSchool] INSERT school error: %v", err)
+			http.Error(w, fmt.Sprintf("Failed to save school to database: %v", err), http.StatusInternalServerError)
+			return
+		}
+		if _, err := pgDB.Exec(`INSERT INTO users(id,school_id,name,email,password,role,first_login) VALUES($1,$2,$3,$4,$5,$6,$7)`,
+			admin.ID, admin.SchoolID, admin.Name, admin.Email, admin.Password, admin.Role, admin.FirstLogin); err != nil {
+			log.Printf("[createSchool] INSERT user error: %v", err)
+			if strings.Contains(err.Error(), "unique constraint") || strings.Contains(err.Error(), "duplicate key") {
+				http.Error(w, "An account with this admin email already exists. Please use a different email or log in.", http.StatusConflict)
+			} else {
+				http.Error(w, fmt.Sprintf("Failed to create admin user: %v", err), http.StatusInternalServerError)
+			}
+			return
+		}
 	} else {
 		localDBMu.Lock()
 		localDB.Schools = append(localDB.Schools, school)
@@ -1708,6 +1794,11 @@ type Assignment struct {
 	DueDate         string  `json:"dueDate"`
 	MaxPoints       float64 `json:"maxPoints"`
 	CreatedAt       string  `json:"createdAt"`
+	FileURL         string  `json:"fileUrl"`
+	ViewURL         string  `json:"viewUrl"`
+	FileName        string  `json:"fileName"`
+	FileSize        int64   `json:"fileSize"`
+	FileType        string  `json:"fileType"`
 	SubmissionCount int     `json:"submissionCount"`
 }
 
@@ -1720,6 +1811,9 @@ type AssignmentSubmission struct {
 	StudentName  string   `json:"studentName"`
 	Content      string   `json:"content"`
 	FileURL      string   `json:"fileUrl"`
+	FileName     string   `json:"fileName"`
+	FileSize     int64    `json:"fileSize"`
+	FileType     string   `json:"fileType"`
 	SubmittedAt  string   `json:"submittedAt"`
 	Grade        *float64 `json:"grade"`
 	Feedback     string   `json:"feedback"`
@@ -1732,9 +1826,11 @@ func listAssignments(w http.ResponseWriter, r *http.Request) {
 	studentID := r.URL.Query().Get("studentId")
 	var list []Assignment
 	if isOnline() {
-		var q string; var args []interface{}
+		var q string
+		var args []interface{}
 		if studentID != "" {
 			q = `SELECT a.id, a.school_id, a.class_id, COALESCE(c.name,''), a.teacher_id, COALESCE(u.name, a.teacher_name, ''), a.title, COALESCE(a.description,''), COALESCE(a.due_date::text,''), COALESCE(a.max_points, 20.0), COALESCE(a.created_at::text,''),
+				COALESCE(a.file_url, ''), COALESCE(a.file_name, ''), COALESCE(a.file_size, 0), COALESCE(a.file_type, ''),
 				(SELECT COUNT(*) FROM assignment_submissions WHERE assignment_id=a.id)
 				FROM assignments a LEFT JOIN classes c ON a.class_id=c.id LEFT JOIN users u ON a.teacher_id=u.id
 				WHERE (a.school_id=$1 OR $1='') AND (a.class_id IN (SELECT class_id FROM enrollments WHERE student_id=$2) OR a.class_id IN (SELECT id FROM classes WHERE school_id=$1))
@@ -1742,12 +1838,14 @@ func listAssignments(w http.ResponseWriter, r *http.Request) {
 			args = []interface{}{schoolID, studentID}
 		} else if classID != "" {
 			q = `SELECT a.id, a.school_id, a.class_id, COALESCE(c.name,''), a.teacher_id, COALESCE(u.name, a.teacher_name, ''), a.title, COALESCE(a.description,''), COALESCE(a.due_date::text,''), COALESCE(a.max_points, 20.0), COALESCE(a.created_at::text,''),
+				COALESCE(a.file_url, ''), COALESCE(a.file_name, ''), COALESCE(a.file_size, 0), COALESCE(a.file_type, ''),
 				(SELECT COUNT(*) FROM assignment_submissions WHERE assignment_id=a.id)
 				FROM assignments a LEFT JOIN classes c ON a.class_id=c.id LEFT JOIN users u ON a.teacher_id=u.id
 				WHERE a.class_id=$1 ORDER BY a.due_date ASC`
 			args = []interface{}{classID}
 		} else {
 			q = `SELECT a.id, a.school_id, a.class_id, COALESCE(c.name,''), a.teacher_id, COALESCE(u.name, a.teacher_name, ''), a.title, COALESCE(a.description,''), COALESCE(a.due_date::text,''), COALESCE(a.max_points, 20.0), COALESCE(a.created_at::text,''),
+				COALESCE(a.file_url, ''), COALESCE(a.file_name, ''), COALESCE(a.file_size, 0), COALESCE(a.file_type, ''),
 				(SELECT COUNT(*) FROM assignment_submissions WHERE assignment_id=a.id)
 				FROM assignments a LEFT JOIN classes c ON a.class_id=c.id LEFT JOIN users u ON a.teacher_id=u.id
 				WHERE (a.school_id=$1 OR $1='') ORDER BY a.due_date ASC`
@@ -1762,11 +1860,22 @@ func listAssignments(w http.ResponseWriter, r *http.Request) {
 		defer rows.Close()
 		for rows.Next() {
 			var a Assignment
-			rows.Scan(&a.ID, &a.SchoolID, &a.ClassID, &a.ClassName, &a.TeacherID, &a.TeacherName, &a.Title, &a.Description, &a.DueDate, &a.MaxPoints, &a.CreatedAt, &a.SubmissionCount)
+			rows.Scan(&a.ID, &a.SchoolID, &a.ClassID, &a.ClassName, &a.TeacherID, &a.TeacherName, &a.Title, &a.Description, &a.DueDate, &a.MaxPoints, &a.CreatedAt, &a.FileURL, &a.FileName, &a.FileSize, &a.FileType, &a.SubmissionCount)
+			// Derive viewUrl from fileUrl: extract UUID from "/uploads/{uuid}_{filename}"
+			if a.FileURL != "" {
+				base := strings.TrimPrefix(a.FileURL, "/uploads/")
+				if idx := strings.Index(base, "_"); idx > 0 {
+					a.ViewURL = "/api/files/" + base[:idx]
+				} else {
+					a.ViewURL = a.FileURL
+				}
+			}
 			list = append(list, a)
 		}
 	}
-	if list == nil { list = []Assignment{} }
+	if list == nil {
+		list = []Assignment{}
+	}
 	jsonResp(w, list)
 }
 
@@ -1779,24 +1888,48 @@ type CreateAssignmentRequest struct {
 	Description string  `json:"description"`
 	DueDate     string  `json:"dueDate"`
 	MaxPoints   float64 `json:"maxPoints"`
+	FileURL     string  `json:"fileUrl"`
+	FileName    string  `json:"fileName"`
+	FileSize    int64   `json:"fileSize"`
+	FileType    string  `json:"fileType"`
 }
 
 func createAssignment(w http.ResponseWriter, r *http.Request) {
 	var req CreateAssignmentRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil { http.Error(w, err.Error(), http.StatusBadRequest); return }
-	if req.MaxPoints <= 0 { req.MaxPoints = 20.0 }
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.MaxPoints <= 0 {
+		req.MaxPoints = 20.0
+	}
 	id := uuid.New().String()
 	now := time.Now().Format(time.RFC3339)
 	if isOnline() {
-		_, err := pgDB.Exec(`INSERT INTO assignments(id,school_id,class_id,teacher_id,teacher_name,title,description,due_date,max_points,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-			id, req.SchoolID, req.ClassID, req.TeacherID, req.TeacherName, req.Title, req.Description, req.DueDate, req.MaxPoints, now)
+		_, err := pgDB.Exec(`INSERT INTO assignments(id,school_id,class_id,teacher_id,teacher_name,title,description,due_date,max_points,created_at,file_url,file_name,file_size,file_type) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+			id, req.SchoolID, req.ClassID, req.TeacherID, req.TeacherName, req.Title, req.Description, req.DueDate, req.MaxPoints, now, req.FileURL, req.FileName, req.FileSize, req.FileType)
 		if err != nil {
 			log.Printf("[Assignments] Create error: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
-	jsonResp(w, Assignment{ID: id, SchoolID: req.SchoolID, ClassID: req.ClassID, TeacherID: req.TeacherID, TeacherName: req.TeacherName, Title: req.Title, Description: req.Description, DueDate: req.DueDate, MaxPoints: req.MaxPoints, CreatedAt: now})
+	jsonResp(w, Assignment{
+		ID:          id,
+		SchoolID:    req.SchoolID,
+		ClassID:     req.ClassID,
+		TeacherID:   req.TeacherID,
+		TeacherName: req.TeacherName,
+		Title:       req.Title,
+		Description: req.Description,
+		DueDate:     req.DueDate,
+		MaxPoints:   req.MaxPoints,
+		CreatedAt:   now,
+		FileURL:     req.FileURL,
+		FileName:    req.FileName,
+		FileSize:    req.FileSize,
+		FileType:    req.FileType,
+	})
 }
 
 func deleteAssignment(w http.ResponseWriter, r *http.Request) {
@@ -1816,6 +1949,9 @@ type SubmitAssignmentRequest struct {
 	StudentName  string `json:"studentName"`
 	Content      string `json:"content"`
 	FileURL      string `json:"fileUrl"`
+	FileName     string `json:"fileName"`
+	FileSize     int64  `json:"fileSize"`
+	FileType     string `json:"fileType"`
 }
 
 func submitAssignment(w http.ResponseWriter, r *http.Request) {
@@ -1827,11 +1963,11 @@ func submitAssignment(w http.ResponseWriter, r *http.Request) {
 	id := uuid.New().String()
 	now := time.Now().Format(time.RFC3339)
 	if isOnline() {
-		_, err := pgDB.Exec(`INSERT INTO assignment_submissions(id, assignment_id, school_id, class_id, student_id, student_name, content, file_url, submitted_at, status)
-			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'submitted')
+		_, err := pgDB.Exec(`INSERT INTO assignment_submissions(id, assignment_id, school_id, class_id, student_id, student_name, content, file_url, file_name, file_size, file_type, submitted_at, status)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'submitted')
 			ON CONFLICT (assignment_id, student_id) DO UPDATE SET
-			content=EXCLUDED.content, file_url=EXCLUDED.file_url, submitted_at=EXCLUDED.submitted_at, status='submitted'`,
-			id, req.AssignmentID, req.SchoolID, req.ClassID, req.StudentID, req.StudentName, req.Content, req.FileURL, now)
+			content=EXCLUDED.content, file_url=EXCLUDED.file_url, file_name=EXCLUDED.file_name, file_size=EXCLUDED.file_size, file_type=EXCLUDED.file_type, submitted_at=EXCLUDED.submitted_at, status='submitted'`,
+			id, req.AssignmentID, req.SchoolID, req.ClassID, req.StudentID, req.StudentName, req.Content, req.FileURL, req.FileName, req.FileSize, req.FileType, now)
 		if err != nil {
 			log.Printf("[Assignments] Submit error: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1845,14 +1981,14 @@ func listAssignmentSubmissions(w http.ResponseWriter, r *http.Request) {
 	assignmentID := chi.URLParam(r, "id")
 	var list []AssignmentSubmission
 	if isOnline() {
-		rows, err := pgDB.Query(`SELECT id, assignment_id, school_id, COALESCE(class_id,''), student_id, COALESCE(student_name,''), COALESCE(content,''), COALESCE(file_url,''), COALESCE(submitted_at::text,''), grade, COALESCE(feedback,''), COALESCE(status,'submitted')
+		rows, err := pgDB.Query(`SELECT id, assignment_id, school_id, COALESCE(class_id,''), student_id, COALESCE(student_name,''), COALESCE(content,''), COALESCE(file_url,''), COALESCE(file_name,''), COALESCE(file_size,0), COALESCE(file_type,''), COALESCE(submitted_at::text,''), grade, COALESCE(feedback,''), COALESCE(status,'submitted')
 			FROM assignment_submissions WHERE assignment_id=$1 ORDER BY submitted_at DESC`, assignmentID)
 		if err == nil && rows != nil {
 			defer rows.Close()
 			for rows.Next() {
 				var s AssignmentSubmission
 				var g sql.NullFloat64
-				rows.Scan(&s.ID, &s.AssignmentID, &s.SchoolID, &s.ClassID, &s.StudentID, &s.StudentName, &s.Content, &s.FileURL, &s.SubmittedAt, &g, &s.Feedback, &s.Status)
+				rows.Scan(&s.ID, &s.AssignmentID, &s.SchoolID, &s.ClassID, &s.StudentID, &s.StudentName, &s.Content, &s.FileURL, &s.FileName, &s.FileSize, &s.FileType, &s.SubmittedAt, &g, &s.Feedback, &s.Status)
 				if g.Valid {
 					v := g.Float64
 					s.Grade = &v
@@ -1861,7 +1997,9 @@ func listAssignmentSubmissions(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if list == nil { list = []AssignmentSubmission{} }
+	if list == nil {
+		list = []AssignmentSubmission{}
+	}
 	jsonResp(w, list)
 }
 
@@ -1870,19 +2008,27 @@ func listStudentSubmissions(w http.ResponseWriter, r *http.Request) {
 	assignmentID := r.URL.Query().Get("assignmentId")
 	var list []AssignmentSubmission
 	if isOnline() {
-		q := `SELECT id, assignment_id, school_id, COALESCE(class_id,''), student_id, COALESCE(student_name,''), COALESCE(content,''), COALESCE(file_url,''), COALESCE(submitted_at::text,''), grade, COALESCE(feedback,''), COALESCE(status,'submitted')
+		q := `SELECT id, assignment_id, school_id, COALESCE(class_id,''), student_id, COALESCE(student_name,''), COALESCE(content,''), COALESCE(file_url,''), COALESCE(file_name,''), COALESCE(file_size,0), COALESCE(file_type,''), COALESCE(submitted_at::text,''), grade, COALESCE(feedback,''), COALESCE(status,'submitted')
 			FROM assignment_submissions WHERE 1=1`
 		args := []interface{}{}
 		n := 1
-		if studentID != "" { q += fmt.Sprintf(" AND student_id=$%d", n); args = append(args, studentID); n++ }
-		if assignmentID != "" { q += fmt.Sprintf(" AND assignment_id=$%d", n); args = append(args, assignmentID); n++ }
+		if studentID != "" {
+			q += fmt.Sprintf(" AND student_id=$%d", n)
+			args = append(args, studentID)
+			n++
+		}
+		if assignmentID != "" {
+			q += fmt.Sprintf(" AND assignment_id=$%d", n)
+			args = append(args, assignmentID)
+			n++
+		}
 		rows, err := pgDB.Query(q, args...)
 		if err == nil && rows != nil {
 			defer rows.Close()
 			for rows.Next() {
 				var s AssignmentSubmission
 				var g sql.NullFloat64
-				rows.Scan(&s.ID, &s.AssignmentID, &s.SchoolID, &s.ClassID, &s.StudentID, &s.StudentName, &s.Content, &s.FileURL, &s.SubmittedAt, &g, &s.Feedback, &s.Status)
+				rows.Scan(&s.ID, &s.AssignmentID, &s.SchoolID, &s.ClassID, &s.StudentID, &s.StudentName, &s.Content, &s.FileURL, &s.FileName, &s.FileSize, &s.FileType, &s.SubmittedAt, &g, &s.Feedback, &s.Status)
 				if g.Valid {
 					v := g.Float64
 					s.Grade = &v
@@ -1891,7 +2037,9 @@ func listStudentSubmissions(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if list == nil { list = []AssignmentSubmission{} }
+	if list == nil {
+		list = []AssignmentSubmission{}
+	}
 	jsonResp(w, list)
 }
 
@@ -1916,6 +2064,344 @@ func gradeAssignmentSubmission(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	jsonResp(w, map[string]interface{}{"success": true, "message": "Assignment graded successfully", "grade": req.Grade, "feedback": req.Feedback})
+}
+
+// =====================================================================
+// SECURE FILE & ASSET STORAGE (Isolated Storage + Streaming + Anti-Exploit)
+// =====================================================================
+
+const IsolatedStorageDir = "./storage/assets"
+
+var dangerousExtensions = map[string]bool{
+	".exe": true, ".dll": true, ".so": true, ".dylib": true,
+	".sh": true, ".bash": true, ".bat": true, ".cmd": true, ".ps1": true, ".vbs": true,
+	".php": true, ".phtml": true, ".py": true, ".rb": true, ".pl": true, ".cgi": true,
+	".jar": true, ".war": true, ".jsp": true, ".asp": true, ".aspx": true,
+	".htm": true, ".html": true, ".xhtml": true, ".shtml": true,
+	".js": true, ".mjs": true, ".ts": true, ".svg": true,
+	".scr": true, ".com": true, ".msi": true,
+}
+
+func sanitizeFilename(name string) string {
+	clean := filepath.Base(filepath.Clean(name))
+	var sb strings.Builder
+	for _, r := range clean {
+		if r >= 32 && r != 127 && r != '\\' && r != '/' && r != ':' && r != '*' && r != '?' && r != '"' && r != '<' && r != '>' && r != '|' {
+			sb.WriteRune(r)
+		}
+	}
+	res := strings.TrimSpace(sb.String())
+	if res == "" {
+		return "document"
+	}
+	return res
+}
+
+func isDangerousFile(ext string) bool {
+	return dangerousExtensions[strings.ToLower(ext)]
+}
+
+func isSafePreviewable(ext string, mimeType string) bool {
+	ext = strings.ToLower(ext)
+	safeExts := map[string]bool{
+		".pdf": true, ".png": true, ".jpg": true, ".jpeg": true,
+		".webp": true, ".gif": true, ".bmp": true,
+		".txt": true, ".csv": true, ".md": true, ".json": true,
+	}
+	if safeExts[ext] {
+		return true
+	}
+	safeMimes := map[string]bool{
+		"application/pdf": true, "image/png": true, "image/jpeg": true,
+		"image/webp": true, "image/gif": true, "image/bmp": true,
+		"text/plain": true, "text/csv": true, "text/markdown": true, "application/json": true,
+	}
+	return safeMimes[mimeType]
+}
+
+func setSecurityHeaders(w http.ResponseWriter) {
+	// General security headers for file endpoints
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	// Modern frame permission is controlled by CSP frame-ancestors
+	w.Header().Set("Content-Security-Policy", "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data:; frame-ancestors *;")
+	w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
+	w.Header().Set("Cross-Origin-Embedder-Policy", "unsafe-none")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "*")
+}
+
+func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
+	// Support large files up to 250MB
+	r.Body = http.MaxBytesReader(w, r.Body, 250<<20)
+	if err := r.ParseMultipartForm(16 << 20); err != nil {
+		http.Error(w, "File upload failed or exceeds 250MB: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	file, handler, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "No file provided: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	bucket := r.FormValue("bucket")
+	if bucket == "" {
+		bucket = "assets"
+	}
+
+	fileId := uuid.New().String()
+	originalFilename := sanitizeFilename(handler.Filename)
+	ext := strings.ToLower(filepath.Ext(originalFilename))
+
+	// Detect / sanitize MIME type
+	mimeType := handler.Header.Get("Content-Type")
+	if mimeType == "" || mimeType == "application/octet-stream" {
+		guessed := mime.TypeByExtension(ext)
+		if guessed != "" {
+			mimeType = guessed
+		} else {
+			mimeType = "application/octet-stream"
+		}
+	}
+
+	// Security check: if file has dangerous extension, enforce application/octet-stream
+	if isDangerousFile(ext) {
+		mimeType = "application/octet-stream"
+	}
+
+	// Ensure isolated storage directory exists
+	_ = os.MkdirAll(IsolatedStorageDir, 0700)
+	isolatedPath := filepath.Join(IsolatedStorageDir, fmt.Sprintf("%s.dat", fileId))
+
+	dstFile, err := os.OpenFile(isolatedPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		http.Error(w, "Failed to initialize isolated storage: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	hasher := sha256.New()
+	multiWriter := io.MultiWriter(dstFile, hasher)
+
+	writtenBytes, err := io.Copy(multiWriter, file)
+	dstFile.Close()
+	if err != nil {
+		_ = os.Remove(isolatedPath)
+		http.Error(w, "Failed to write file stream: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	hashStr := hex.EncodeToString(hasher.Sum(nil))
+
+	// Also write to ./uploads directory for legacy cache compatibility
+	uploadDir := "./uploads"
+	_ = os.MkdirAll(uploadDir, 0755)
+	storedLegacyName := fmt.Sprintf("%s_%s", fileId, originalFilename)
+	legacyPath := filepath.Join(uploadDir, storedLegacyName)
+
+	// Copy isolated data to legacy path
+	if srcF, err := os.Open(isolatedPath); err == nil {
+		if legF, err := os.Create(legacyPath); err == nil {
+			_, _ = io.Copy(legF, srcF)
+			legF.Close()
+		}
+		srcF.Close()
+	}
+
+	s3Key := fmt.Sprintf("uploads/%s", storedLegacyName)
+
+	// Save to DB file_assets bucket metadata
+	if isOnline() {
+		_, err := pgDB.Exec(`INSERT INTO file_assets(id, bucket, key, filename, mime_type, size_bytes, storage_path, sha256_hash)
+			VALUES($1, $2, $3, $4, $5, $6, $7, $8)
+			ON CONFLICT (key) DO UPDATE SET filename=EXCLUDED.filename, size_bytes=EXCLUDED.size_bytes, storage_path=EXCLUDED.storage_path, sha256_hash=EXCLUDED.sha256_hash`,
+			fileId, bucket, s3Key, originalFilename, mimeType, writtenBytes, isolatedPath, hashStr)
+		if err != nil {
+			log.Printf("[Storage] DB asset store metadata error: %v", err)
+		}
+	}
+
+	fileURL := "/uploads/" + storedLegacyName
+	downloadURL := fmt.Sprintf("/api/files/download/%s", fileId)
+	viewURL := fmt.Sprintf("/api/files/%s", fileId)
+
+	jsonResp(w, map[string]interface{}{
+		"success":     true,
+		"id":          fileId,
+		"bucket":      bucket,
+		"key":         s3Key,
+		"url":         fileURL,
+		"downloadUrl": downloadURL,
+		"viewUrl":     viewURL,
+		"fileName":    originalFilename,
+		"size":        writtenBytes,
+		"type":        mimeType,
+		"hash":        hashStr,
+	})
+}
+
+func getFileHandler(w http.ResponseWriter, r *http.Request) {
+	setSecurityHeaders(w)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	id := sanitizeFilename(chi.URLParam(r, "id"))
+	var filename, mimeType, storagePath string
+	var sizeBytes int64
+
+	if isOnline() {
+		_ = pgDB.QueryRow(`SELECT filename, mime_type, size_bytes, COALESCE(storage_path,'') 
+			FROM file_assets WHERE id=$1 OR key=$1 OR key LIKE '%' || $1 OR filename=$1`, id).Scan(&filename, &mimeType, &sizeBytes, &storagePath)
+	}
+
+	if filename == "" {
+		filename = id
+	}
+
+	ext := strings.ToLower(filepath.Ext(filename))
+
+	// Check isolated storage path first
+	candidatePaths := []string{}
+	if storagePath != "" {
+		candidatePaths = append(candidatePaths, storagePath)
+	}
+	candidatePaths = append(candidatePaths,
+		filepath.Join(IsolatedStorageDir, fmt.Sprintf("%s.dat", id)),
+		filepath.Join("./uploads", id),
+	)
+
+	// If id is uuid_filename, extract uuid
+	if strings.Contains(id, "_") {
+		parts := strings.SplitN(id, "_", 2)
+		candidatePaths = append(candidatePaths, filepath.Join(IsolatedStorageDir, fmt.Sprintf("%s.dat", parts[0])))
+	}
+
+	// Match any files in uploads that start with id + "_"
+	if matches, err := filepath.Glob(filepath.Join("./uploads", id+"_*")); err == nil {
+		candidatePaths = append(candidatePaths, matches...)
+	}
+	if matches, err := filepath.Glob(filepath.Join(IsolatedStorageDir, id+"*")); err == nil {
+		candidatePaths = append(candidatePaths, matches...)
+	}
+
+	var targetFile *os.File
+	var fileInfo os.FileInfo
+	for _, p := range candidatePaths {
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+			if f, err := os.Open(p); err == nil {
+				targetFile = f
+				fileInfo = fi
+				if filename == id {
+					filename = filepath.Base(p)
+					if strings.Contains(filename, "_") {
+						filename = strings.SplitN(filename, "_", 2)[1]
+					}
+				}
+				break
+			}
+		}
+	}
+
+	if targetFile == nil {
+		http.Error(w, "File not found or inaccessible", http.StatusNotFound)
+		return
+	}
+	defer targetFile.Close()
+
+	if isDangerousFile(ext) {
+		// Never allow inline execution of dangerous files
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	} else if isSafePreviewable(ext, mimeType) {
+		if mimeType == "" {
+			mimeType = mime.TypeByExtension(ext)
+			if mimeType == "" {
+				mimeType = "application/pdf"
+			}
+		}
+		w.Header().Set("Content-Type", mimeType)
+		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", filename))
+	} else {
+		if mimeType == "" {
+			mimeType = "application/octet-stream"
+		}
+		w.Header().Set("Content-Type", mimeType)
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	}
+
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	http.ServeContent(w, r, filename, fileInfo.ModTime(), targetFile)
+}
+
+func downloadFileHandler(w http.ResponseWriter, r *http.Request) {
+	setSecurityHeaders(w)
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	id := sanitizeFilename(chi.URLParam(r, "id"))
+	var filename string
+	var storagePath string
+
+	if isOnline() {
+		_ = pgDB.QueryRow(`SELECT filename, COALESCE(storage_path,'') 
+			FROM file_assets WHERE id=$1 OR key=$1 OR key LIKE '%' || $1 OR filename=$1`, id).Scan(&filename, &storagePath)
+	}
+
+	if filename == "" {
+		filename = id
+	}
+
+	candidatePaths := []string{}
+	if storagePath != "" {
+		candidatePaths = append(candidatePaths, storagePath)
+	}
+	candidatePaths = append(candidatePaths,
+		filepath.Join(IsolatedStorageDir, fmt.Sprintf("%s.dat", id)),
+		filepath.Join("./uploads", id),
+	)
+	if strings.Contains(id, "_") {
+		parts := strings.SplitN(id, "_", 2)
+		candidatePaths = append(candidatePaths, filepath.Join(IsolatedStorageDir, fmt.Sprintf("%s.dat", parts[0])))
+	}
+	if matches, err := filepath.Glob(filepath.Join("./uploads", id+"_*")); err == nil {
+		candidatePaths = append(candidatePaths, matches...)
+	}
+	if matches, err := filepath.Glob(filepath.Join(IsolatedStorageDir, id+"*")); err == nil {
+		candidatePaths = append(candidatePaths, matches...)
+	}
+
+	var targetFile *os.File
+	var fileInfo os.FileInfo
+	for _, p := range candidatePaths {
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+			if f, err := os.Open(p); err == nil {
+				targetFile = f
+				fileInfo = fi
+				if filename == id {
+					filename = filepath.Base(p)
+					if strings.Contains(filename, "_") {
+						filename = strings.SplitN(filename, "_", 2)[1]
+					}
+				}
+				break
+			}
+		}
+	}
+
+	if targetFile == nil {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+	defer targetFile.Close()
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	http.ServeContent(w, r, filename, fileInfo.ModTime(), targetFile)
 }
 
 // =====================================================================

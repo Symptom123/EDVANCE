@@ -37,16 +37,22 @@ const CreateSchool = () => {
   };
 
   const handleFinish = async () => {
+    if (!config.schoolName?.trim() || !config.adminName?.trim() || !config.adminEmail?.trim() || !config.adminPass?.trim()) {
+      alert("Please fill in all required fields (School Name, Admin Name, Admin Email, Admin Password) in Step 1.");
+      setStep(1);
+      return;
+    }
+
     setLoading(true);
     try {
       const payload = {
-        adminName: config.adminName,
-        adminEmail: config.adminEmail,
+        adminName: config.adminName.trim(),
+        adminEmail: config.adminEmail.trim().toLowerCase(),
         adminPass: config.adminPass,
-        schoolName: config.schoolName,
-        primaryColor: config.primaryColor,
-        hasPrimary: config.levels.primary,
-        hasSecondary: config.levels.secondary,
+        schoolName: config.schoolName.trim(),
+        primaryColor: config.primaryColor || '#10B981',
+        hasPrimary: Boolean(config.levels?.primary),
+        hasSecondary: Boolean(config.levels?.secondary),
         configJson: JSON.stringify({ roles: config.roles, modules: config.modules })
       };
 
@@ -56,7 +62,17 @@ const CreateSchool = () => {
         body: JSON.stringify(payload)
       });
 
-      if (!res.ok) throw new Error("Failed to create school");
+      if (!res.ok) {
+        let errorMsg = `Server error (${res.status})`;
+        try {
+          const errData = await res.json();
+          errorMsg = errData.error || errData.message || JSON.stringify(errData);
+        } catch {
+          const text = await res.text().catch(() => '');
+          if (text) errorMsg = text.trim();
+        }
+        throw new Error(errorMsg);
+      }
       const data = await res.json();
       
       // Save data locally for quick access
