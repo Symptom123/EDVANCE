@@ -1,9 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Download, FileText, CheckCircle2, AlertCircle, Loader2, Printer } from 'lucide-react';
-import html2pdf from 'html2pdf.js/dist/html2pdf.js';
 import { T, cardStyle, inputStyle, btnStyle } from '../styles/portalTheme';
 import ReportCardView from './ReportCardView';
 import ReportCardControls from './ReportCardControls';
+
+// Helper to dynamically load html2pdf from CDN when needed (bypasses bundler ESM resolution issues)
+const loadHtml2Pdf = () => {
+  if (typeof window !== 'undefined' && window.html2pdf) {
+    return Promise.resolve(window.html2pdf);
+  }
+  return new Promise((resolve, reject) => {
+    const existing = document.getElementById('html2pdf-cdn');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(window.html2pdf));
+      existing.addEventListener('error', reject);
+      return;
+    }
+    const script = document.createElement('script');
+    script.id = 'html2pdf-cdn';
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+    script.onload = () => resolve(window.html2pdf);
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+};
 
 export default function AdminReportCardGenerator({ config, accent }) {
   const [classes, setClasses] = useState([]);
@@ -35,6 +55,9 @@ export default function AdminReportCardGenerator({ config, accent }) {
     if (!el) return;
     setExportingPDF(true);
     try {
+      const html2pdf = await loadHtml2Pdf();
+      const selectedClass = classes.find(c => String(c.id || c.ID) === String(classId));
+      const selectedClassName = selectedClass?.name || 'ReportCards';
       const classNameClean = (selectedClassName || 'ReportCards').replace(/[^a-zA-Z0-9_-]/g, '_');
       const filename = `${classNameClean}_Term_${term}_${academicYear}.pdf`;
       const opt = {
