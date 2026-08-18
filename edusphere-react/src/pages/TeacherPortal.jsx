@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ClipboardCheck, GraduationCap, FileText, UserPlus, Megaphone, User, LogOut, Plus, Loader2, CheckCircle2, X, Mail, Trash2, Download, BookOpen, Users, Menu, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { LayoutDashboard, ClipboardCheck, GraduationCap, FileText, UserPlus, Megaphone, User, LogOut, Plus, Loader2, CheckCircle2, X, Mail, Trash2, Download, BookOpen, Users, Menu, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Eye, Paperclip, FileCheck } from 'lucide-react';
 import { T, rgba, navItemStyle, cardStyle, inputStyle, btnStyle, badge } from '../styles/portalTheme';
 import * as XLSX from 'xlsx';
 import TeacherMarkEntryForm from '../components/TeacherMarkEntryForm';
+import DocumentViewerModal, { triggerFileDownload, formatFileSize } from '../components/DocumentViewerModal';
+import FileUploadDropzone from '../components/FileUploadDropzone';
 
 export default function TeacherPortal() {
   const navigate = useNavigate();
@@ -55,6 +57,8 @@ export default function TeacherPortal() {
   const [assignLoading, setAssignLoading] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [newAssign, setNewAssign] = useState({ title: '', description: '', dueDate: '', maxPoints: 20 });
+  const [attachedDoc, setAttachedDoc] = useState(null);
+  const [viewingDoc, setViewingDoc] = useState(null);
   const [selectedAssignForGrading, setSelectedAssignForGrading] = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [submissionsLoading, setSubmissionsLoading] = useState(false);
@@ -91,7 +95,7 @@ export default function TeacherPortal() {
     const sid = config.schoolId || '';
     
     // Fetch dashboard
-    fetch(`http://localhost:8080/api/dashboard/teacher/${tid}?schoolId=${sid}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/teacher/${tid}?schoolId=${sid}`)
       .then(r => r.json())
       .then(d => {
         setDashData(d || { classes: 0, students: 0, avgScore: 0, chartData: [] });
@@ -99,7 +103,7 @@ export default function TeacherPortal() {
       }).catch(() => setDashLoading(false));
 
     // Fetch classes
-    fetch(`http://localhost:8080/api/classes?schoolId=${sid}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/classes?schoolId=${sid}`)
       .then(r => r.json())
       .then(c => {
         const mine = (c || []).filter(cls => !cls.teacherId || cls.teacherId === tid || cls.teacherId === config.name || String(cls.teacherId) === String(tid));
@@ -113,19 +117,19 @@ export default function TeacherPortal() {
       });
 
     // Fetch sequences
-    fetch(`http://localhost:8080/api/sequences?schoolId=${config.schoolId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/sequences?schoolId=${config.schoolId}`)
       .then(r => r.json())
       .then(s => setSequences(s || []));
 
     // Fetch users for messages
-    fetch(`http://localhost:8080/api/users?schoolId=${config.schoolId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/users?schoolId=${config.schoolId}`)
       .then(r => r.json())
       .then(u => {
         setMsgUsers((u || []).filter(user => user.id !== config.id));
       });
 
     // Fetch all students for class enrollment management
-    fetch(`http://localhost:8080/api/users?schoolId=${config.schoolId}&role=Student`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/users?schoolId=${config.schoolId}&role=Student`)
       .then(r => r.json())
       .then(s => setAllSchoolStudents(s || []));
 
@@ -137,8 +141,8 @@ export default function TeacherPortal() {
     setAttLoading(true);
     
     Promise.all([
-      fetch(`http://localhost:8080/api/enrollments?schoolId=${config.schoolId}&classId=${attClassId}`).then(r => r.json()),
-      fetch(`http://localhost:8080/api/attendance?schoolId=${config.schoolId}&classId=${attClassId}&date=${attDate}`).then(r => r.json())
+      fetch(`${import.meta.env.VITE_API_URL}/api/enrollments?schoolId=${config.schoolId}&classId=${attClassId}`).then(r => r.json()),
+      fetch(`${import.meta.env.VITE_API_URL}/api/attendance?schoolId=${config.schoolId}&classId=${attClassId}&date=${attDate}`).then(r => r.json())
     ]).then(([enr, att]) => {
       setAttStudents(enr || []);
       const attMap = {};
@@ -160,7 +164,7 @@ export default function TeacherPortal() {
   const handleSaveAttendance = () => {
     setAttSuccess('');
     const tid = config.id || config.userId || '';
-    fetch(`http://localhost:8080/api/attendance`, {
+    fetch(`${import.meta.env.VITE_API_URL}/api/attendance`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -187,8 +191,8 @@ export default function TeacherPortal() {
     setGradLoading(true);
 
     Promise.all([
-      fetch(`http://localhost:8080/api/enrollments?schoolId=${config.schoolId}&classId=${gradingClassId}`).then(r => r.json()),
-      fetch(`http://localhost:8080/api/marks?schoolId=${config.schoolId}&classId=${gradingClassId}&sequenceId=${gradingSequenceId}`).then(r => r.json())
+      fetch(`${import.meta.env.VITE_API_URL}/api/enrollments?schoolId=${config.schoolId}&classId=${gradingClassId}`).then(r => r.json()),
+      fetch(`${import.meta.env.VITE_API_URL}/api/marks?schoolId=${config.schoolId}&classId=${gradingClassId}&sequenceId=${gradingSequenceId}`).then(r => r.json())
     ]).then(([enr, marksData]) => {
       setGradStudents(enr || []);
       const m = {};
@@ -208,7 +212,7 @@ export default function TeacherPortal() {
       const score = marks[s.studentId];
       if (score === undefined || score === '') return Promise.resolve();
       
-      return fetch(`http://localhost:8080/api/marks`, {
+      return fetch(`${import.meta.env.VITE_API_URL}/api/marks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -268,7 +272,7 @@ export default function TeacherPortal() {
   const fetchAssignments = () => {
     if (!assignClassId) return;
     setAssignLoading(true);
-    fetch(`http://localhost:8080/api/assignments?schoolId=${config.schoolId}&classId=${assignClassId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/assignments?schoolId=${config.schoolId}&classId=${assignClassId}`)
       .then(r => r.json())
       .then(d => { setAssignments(d || []); setAssignLoading(false); })
       .catch(() => setAssignLoading(false));
@@ -280,7 +284,7 @@ export default function TeacherPortal() {
   const handleCreateAssignment = (e) => {
     e.preventDefault();
     const tid = config.id || config.userId || '';
-    fetch(`http://localhost:8080/api/assignments`, {
+    fetch(`${import.meta.env.VITE_API_URL}/api/assignments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -291,12 +295,17 @@ export default function TeacherPortal() {
         title: newAssign.title,
         description: newAssign.description,
         dueDate: newAssign.dueDate,
-        maxPoints: Number(newAssign.maxPoints) || 20
+        maxPoints: Number(newAssign.maxPoints) || 20,
+        fileUrl: attachedDoc ? attachedDoc.fileUrl : '',
+        fileName: attachedDoc ? attachedDoc.fileName : '',
+        fileSize: attachedDoc ? attachedDoc.fileSize : 0,
+        fileType: attachedDoc ? attachedDoc.fileType : ''
       })
     }).then(r => {
       if (r.ok) {
         setShowAssignModal(false);
         setNewAssign({ title: '', description: '', dueDate: '', maxPoints: 20 });
+        setAttachedDoc(null);
         setAssignSuccess('Assignment created and dispatched to students!');
         setTimeout(() => setAssignSuccess(''), 4000);
         fetchAssignments();
@@ -308,7 +317,7 @@ export default function TeacherPortal() {
     setSelectedAssignForGrading(assign);
     setSubmissionsLoading(true);
     setAssignSuccess('');
-    fetch(`http://localhost:8080/api/assignments/${assign.id || assign.ID}/submissions`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/assignments/${assign.id || assign.ID}/submissions`)
       .then(r => r.json())
       .then(d => {
         setSubmissions(Array.isArray(d) ? d : []);
@@ -319,7 +328,7 @@ export default function TeacherPortal() {
 
   const handleSaveGrade = (submissionId, gradeVal, feedbackVal) => {
     setSaveGradeLoading(true);
-    fetch(`http://localhost:8080/api/assignments/submissions/${submissionId}/grade`, {
+    fetch(`${import.meta.env.VITE_API_URL}/api/assignments/submissions/${submissionId}/grade`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -341,7 +350,7 @@ export default function TeacherPortal() {
   // Handle Announcements tab
   const fetchAnnouncements = () => {
     setAnnLoading(true);
-    fetch(`http://localhost:8080/api/announcements?schoolId=${config.schoolId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/announcements?schoolId=${config.schoolId}`)
       .then(r => r.json())
       .then(d => { setAnnouncements(d || []); setAnnLoading(false); })
       .catch(() => setAnnLoading(false));
@@ -352,7 +361,7 @@ export default function TeacherPortal() {
 
   const handleCreateAnnouncement = () => {
     if (!annText.trim() || !annClassId) return;
-    fetch(`http://localhost:8080/api/announcements`, {
+    fetch(`${import.meta.env.VITE_API_URL}/api/announcements`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -371,14 +380,14 @@ export default function TeacherPortal() {
   };
 
   const handleDeleteAnnouncement = (id) => {
-    fetch(`http://localhost:8080/api/announcements/${id}`, { method: 'DELETE' })
+    fetch(`${import.meta.env.VITE_API_URL}/api/announcements/${id}`, { method: 'DELETE' })
       .then(r => { if(r.ok) fetchAnnouncements(); });
   };
 
   // Handle Messages tab
   const fetchMessages = () => {
     setMsgLoading(true);
-    fetch(`http://localhost:8080/api/messages?userId=${config.id}&box=inbox`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/messages?userId=${config.id}&box=inbox`)
       .then(r => r.json())
       .then(d => { setMessages(d || []); setMsgLoading(false); })
       .catch(() => setMsgLoading(false));
@@ -389,14 +398,14 @@ export default function TeacherPortal() {
 
   const handleReadMessage = (msg) => {
     if (!msg.isRead) {
-      fetch(`http://localhost:8080/api/messages/${msg.id || msg.ID}/read`, { method: 'PUT' })
+      fetch(`${import.meta.env.VITE_API_URL}/api/messages/${msg.id || msg.ID}/read`, { method: 'PUT' })
         .then(() => fetchMessages());
     }
   };
 
   const handleSendMessage = (e) => {
     e.preventDefault();
-    fetch(`http://localhost:8080/api/messages`, {
+    fetch(`${import.meta.env.VITE_API_URL}/api/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -663,13 +672,13 @@ export default function TeacherPortal() {
         <div style={{ ...cardStyle, textAlign: 'center', padding: '50px 20px' }}>
           <FileText size={36} style={{ color: T.light, marginBottom: 12 }} />
           <h3 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 6px', color: T.text }}>No Assignments for this Class</h3>
-          <p style={{ color: T.muted, fontSize: 14, margin: '0 0 16px' }}>Create an assignment to assign coursework, review submitted work, and return grades to your students.</p>
+          <p style={{ color: T.muted, fontSize: 14, margin: '0 0 16px' }}>Create an assignment to assign coursework, attach study documents, review submitted work, and return grades to your students.</p>
           <button onClick={() => setShowAssignModal(true)} style={btnStyle(accent)}>
             <Plus size={15} /> Create First Assignment
           </button>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
           {assignments.map((a, i) => (
             <div key={a.id || i} style={{ ...cardStyle, borderLeft: `4px solid ${accent}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div>
@@ -680,7 +689,78 @@ export default function TeacherPortal() {
                 <p style={{ color: T.muted, fontSize: 12, margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 4 }}>
                   <span>📅 Due: {new Date(a.dueDate).toLocaleDateString()}</span>
                 </p>
-                <p style={{ color: T.text, fontSize: 14, lineHeight: 1.5, marginBottom: 16 }}>{a.description}</p>
+                <p style={{ color: T.text, fontSize: 14, lineHeight: 1.5, marginBottom: 12 }}>{a.description}</p>
+
+                {/* Attached Teacher Document Card */}
+                {a.fileUrl && (
+                  <div
+                    style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 8,
+                      padding: '10px 12px',
+                      marginBottom: 14,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                      <Paperclip size={15} color={accent} style={{ flexShrink: 0 }} />
+                      <div style={{ overflow: 'hidden' }}>
+                        <span
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: T.text,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            display: 'block',
+                            maxWidth: '170px'
+                          }}
+                          title={a.fileName || 'Attached Document'}
+                        >
+                          {a.fileName || 'Assignment Document'}
+                        </span>
+                        {a.fileSize > 0 && (
+                          <span style={{ fontSize: 11, color: T.muted }}>
+                            {formatFileSize(a.fileSize)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        type="button"
+                        onClick={() => setViewingDoc({ url: a.fileUrl, fileName: a.fileName, fileSize: a.fileSize, fileType: a.fileType })}
+                        style={{
+                          ...btnStyle(accent, true),
+                          padding: '4px 8px',
+                          fontSize: 11,
+                          borderRadius: 6
+                        }}
+                        title="View Document"
+                      >
+                        <Eye size={12} /> View
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => triggerFileDownload(a.fileUrl, a.fileName)}
+                        style={{
+                          ...btnStyle(accent),
+                          padding: '4px 8px',
+                          fontSize: 11,
+                          borderRadius: 6
+                        }}
+                        title="Download Document"
+                      >
+                        <Download size={12} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div style={{ borderTop: `1px solid ${T.borderLight}`, paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -696,7 +776,7 @@ export default function TeacherPortal() {
                   </button>
                   <button onClick={() => {
                     if (window.confirm('Delete this assignment?')) {
-                      fetch(`http://localhost:8080/api/assignments/${a.id || a.ID}`, { method: 'DELETE' }).then(() => fetchAssignments());
+                      fetch(`${import.meta.env.VITE_API_URL}/api/assignments/${a.id || a.ID}`, { method: 'DELETE' }).then(() => fetchAssignments());
                     }
                   }} style={{ ...btnStyle('#ef4444', true), flex: 1, justifyContent: 'center', padding: '6px 8px', fontSize: 12 }}>
                     <Trash2 size={13}/> Delete
@@ -710,10 +790,12 @@ export default function TeacherPortal() {
 
       {/* CREATE ASSIGNMENT MODAL */}
       {showAssignModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
-          <div style={{ ...cardStyle, width: 440, maxWidth: '90%', position: 'relative' }}>
-            <button onClick={() => setShowAssignModal(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: T.muted }}><X size={18} /></button>
-            <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 16px', fontSize: 22, color: T.text }}>Create Assignment</h2>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
+          <div style={{ ...cardStyle, width: 520, maxWidth: '94%', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
+            <button onClick={() => { setShowAssignModal(false); setAttachedDoc(null); }} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: T.muted }}><X size={18} /></button>
+            <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 6px', fontSize: 24, color: T.text }}>Create Assignment</h2>
+            <p style={{ color: T.muted, fontSize: 13, margin: '0 0 16px' }}>Dispatch coursework, attach documents, and set deadlines for students.</p>
+
             <form onSubmit={handleCreateAssignment} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>Assignment Title</label>
@@ -721,7 +803,7 @@ export default function TeacherPortal() {
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>Instructions / Description</label>
-                <textarea required value={newAssign.description} onChange={e => setNewAssign(a => ({ ...a, description: e.target.value }))} rows={4} placeholder="Describe the task and expectations for the students..." style={{ ...inputStyle, resize: 'vertical' }} />
+                <textarea required value={newAssign.description} onChange={e => setNewAssign(a => ({ ...a, description: e.target.value }))} rows={3} placeholder="Describe the task and expectations for the students..." style={{ ...inputStyle, resize: 'vertical' }} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
@@ -733,9 +815,20 @@ export default function TeacherPortal() {
                   <input required type="number" min="1" max="100" value={newAssign.maxPoints} onChange={e => setNewAssign(a => ({ ...a, maxPoints: e.target.value }))} style={inputStyle} />
                 </div>
               </div>
+
+              {/* Attach Document Dropzone */}
+              <FileUploadDropzone
+                label="Attach Assignment Document / Worksheet (Optional)"
+                hint="Upload PDF, Word, PowerPoint, Excel, Images, or Text (up to 50MB)"
+                file={attachedDoc}
+                onFileChange={setAttachedDoc}
+                accent={accent}
+                onPreview={(f) => setViewingDoc(f)}
+              />
+
               <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
                 <button type="submit" style={{ ...btnStyle(accent), flex: 1, justifyContent: 'center' }}>Publish to Class</button>
-                <button type="button" onClick={() => setShowAssignModal(false)} style={{ ...btnStyle('#6b7280'), flex: 1, justifyContent: 'center' }}>Cancel</button>
+                <button type="button" onClick={() => { setShowAssignModal(false); setAttachedDoc(null); }} style={{ ...btnStyle('#6b7280'), flex: 1, justifyContent: 'center' }}>Cancel</button>
               </div>
             </form>
           </div>
@@ -744,15 +837,26 @@ export default function TeacherPortal() {
 
       {/* VIEW SUBMISSIONS & GRADING MODAL */}
       {selectedAssignForGrading && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
-          <div style={{ ...cardStyle, width: 650, maxWidth: '95%', maxHeight: '88vh', overflowY: 'auto', position: 'relative' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
+          <div style={{ ...cardStyle, width: 720, maxWidth: '96%', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
             <button onClick={() => setSelectedAssignForGrading(null)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: T.muted }}><X size={20} /></button>
             <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 4px', fontSize: 24, color: T.text }}>
               Submissions: {selectedAssignForGrading.title}
             </h2>
-            <p style={{ color: T.muted, fontSize: 13, margin: '0 0 18px' }}>
-              Max Points: <strong>{selectedAssignForGrading.maxPoints || 20}</strong> | Due: {new Date(selectedAssignForGrading.dueDate).toLocaleDateString()}
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '0 0 16px' }}>
+              <span style={{ color: T.muted, fontSize: 13 }}>
+                Max Points: <strong>{selectedAssignForGrading.maxPoints || 20}</strong> | Due: {new Date(selectedAssignForGrading.dueDate).toLocaleDateString()}
+              </span>
+              {selectedAssignForGrading.fileUrl && (
+                <button
+                  type="button"
+                  onClick={() => setViewingDoc({ url: selectedAssignForGrading.fileUrl, fileName: selectedAssignForGrading.fileName, fileSize: selectedAssignForGrading.fileSize, fileType: selectedAssignForGrading.fileType })}
+                  style={{ ...btnStyle(accent, true), padding: '4px 10px', fontSize: 12, borderRadius: 6 }}
+                >
+                  <Paperclip size={13} /> View Attached Assignment Sheet
+                </button>
+              )}
+            </div>
 
             {submissionsLoading ? (
               <div style={{ padding: '30px 0', textAlign: 'center', color: T.muted }}><Loader2 size={16} className="spin" /> Loading student submissions...</div>
@@ -761,7 +865,7 @@ export default function TeacherPortal() {
                 <p style={{ color: T.muted, margin: 0, fontSize: 14, fontStyle: 'italic' }}>No students have submitted work for this assignment yet.</p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {submissions.map((sub, i) => (
                   <div key={sub.id || i} style={{ border: `1px solid ${T.border}`, borderRadius: 10, padding: 16, background: sub.status === 'graded' ? '#f0fdf4' : '#fff' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
@@ -774,9 +878,60 @@ export default function TeacherPortal() {
                       </span>
                     </div>
 
-                    <div style={{ background: '#f8fafc', padding: 12, borderRadius: 6, border: '1px solid #e2e8f0', margin: '8px 0 12px', fontSize: 14, color: '#334155', whiteSpace: 'pre-wrap' }}>
+                    {/* Student Text Content */}
+                    <div style={{ background: '#f8fafc', padding: 12, borderRadius: 6, border: '1px solid #e2e8f0', margin: '8px 0 10px', fontSize: 14, color: '#334155', whiteSpace: 'pre-wrap' }}>
                       {sub.content || '(No text content submitted)'}
                     </div>
+
+                    {/* Student Submitted Attached Document */}
+                    {sub.fileUrl && (
+                      <div
+                        style={{
+                          background: '#f1f5f9',
+                          border: '1.5px solid #cbd5e1',
+                          borderRadius: 8,
+                          padding: '10px 14px',
+                          margin: '0 0 12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 10
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
+                          <div style={{ width: 32, height: 32, borderRadius: 6, background: '#e2e8f0', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <FileCheck size={18} />
+                          </div>
+                          <div style={{ overflow: 'hidden' }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '320px' }}>
+                              {sub.fileName || 'Student Submitted Document'}
+                            </span>
+                            {sub.fileSize > 0 && (
+                              <span style={{ fontSize: 11, color: T.muted }}>
+                                {formatFileSize(sub.fileSize)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            type="button"
+                            onClick={() => setViewingDoc({ url: sub.fileUrl, fileName: sub.fileName, fileSize: sub.fileSize, fileType: sub.fileType })}
+                            style={{ ...btnStyle(accent, true), padding: '6px 12px', fontSize: 12, borderRadius: 6 }}
+                          >
+                            <Eye size={13} /> View File
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => triggerFileDownload(sub.fileUrl, sub.fileName)}
+                            style={{ ...btnStyle(accent), padding: '6px 12px', fontSize: 12, borderRadius: 6 }}
+                          >
+                            <Download size={13} /> Download
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {sub.feedback && (
                       <p style={{ fontSize: 13, color: '#0f766e', background: '#f0fdfa', padding: '8px 10px', borderRadius: 6, margin: '0 0 10px' }}>
@@ -950,7 +1105,7 @@ export default function TeacherPortal() {
   const fetchClassesAgain = () => {
     const tid = config?.id || config?.userId || '';
     const sid = config?.schoolId || '';
-    fetch(`http://localhost:8080/api/classes?schoolId=${sid}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/classes?schoolId=${sid}`)
       .then(r => r.json())
       .then(c => {
         const mine = (c || []).filter(cls => !cls.teacherId || cls.teacherId === tid || cls.teacherId === config.name || String(cls.teacherId) === String(tid));
@@ -969,7 +1124,7 @@ export default function TeacherPortal() {
     setSelectedManageClass(cls);
     setRosterLoading(true);
     const classId = cls.id || cls.ID;
-    fetch(`http://localhost:8080/api/enrollments?schoolId=${config.schoolId}&classId=${classId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/enrollments?schoolId=${config.schoolId}&classId=${classId}`)
       .then(r => r.json())
       .then(d => { setClassRoster(d || []); setRosterLoading(false); })
       .catch(() => setRosterLoading(false));
@@ -978,7 +1133,7 @@ export default function TeacherPortal() {
   const handleAddStudentToClass = () => {
     if (!addRosterStudentId || !selectedManageClass) return;
     const classId = selectedManageClass.id || selectedManageClass.ID;
-    fetch(`http://localhost:8080/api/enrollments`, {
+    fetch(`${import.meta.env.VITE_API_URL}/api/enrollments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -997,7 +1152,7 @@ export default function TeacherPortal() {
   const handleRemoveStudentFromClass = (studentId) => {
     if (!selectedManageClass || !window.confirm('Remove student from this class?')) return;
     const classId = selectedManageClass.id || selectedManageClass.ID;
-    fetch(`http://localhost:8080/api/enrollments?classId=${classId}&studentId=${studentId}`, {
+    fetch(`${import.meta.env.VITE_API_URL}/api/enrollments?classId=${classId}&studentId=${studentId}`, {
       method: 'DELETE'
     }).then(r => {
       if (r.ok) {
@@ -1012,7 +1167,7 @@ export default function TeacherPortal() {
     setCreateClassLoading(true);
     setClassSuccess('');
     const tid = config.id || config.userId || '';
-    fetch(`http://localhost:8080/api/classes`, {
+    fetch(`${import.meta.env.VITE_API_URL}/api/classes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1280,6 +1435,9 @@ export default function TeacherPortal() {
           ))}
         </div>
       </div>}
+
+      {/* DOCUMENT VIEWER MODAL */}
+      <DocumentViewerModal file={viewingDoc} onClose={() => setViewingDoc(null)} accent={accent} />
     </div>
   );
 }

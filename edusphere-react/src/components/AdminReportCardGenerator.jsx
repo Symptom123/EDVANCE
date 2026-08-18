@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Download, FileText, CheckCircle2, AlertCircle, Loader2, Printer } from 'lucide-react';
+import html2pdf from 'html2pdf.js';
 import { T, cardStyle, inputStyle, btnStyle } from '../styles/portalTheme';
 import ReportCardView from './ReportCardView';
 import ReportCardControls from './ReportCardControls';
@@ -18,20 +19,51 @@ export default function AdminReportCardGenerator({ config, accent }) {
   const [selectedCard, setSelectedCard] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [customFields, setCustomFields] = useState({});
+  const [exportingPDF, setExportingPDF] = useState(false);
+  const printRootRef = useRef(null);
 
   useEffect(() => {
     if (!config) return;
-    fetch(`http://localhost:8080/api/classes?schoolId=${config.schoolId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/classes?schoolId=${config.schoolId}`)
       .then(r => r.json())
       .then(data => { if (Array.isArray(data)) setClasses(data); });
   }, [config]);
+
+  // --- High-fidelity direct PDF download using html2pdf without browser freeze ---
+  const handleExportPDF = async () => {
+    const el = printRootRef.current;
+    if (!el) return;
+    setExportingPDF(true);
+    try {
+      const classNameClean = (selectedClassName || 'ReportCards').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `${classNameClean}_Term_${term}_${academicYear}.pdf`;
+      const opt = {
+        margin: [5, 5, 5, 5],
+        filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] }
+      };
+      await html2pdf().set(opt).from(el).save();
+    } catch (err) {
+      console.error('PDF Export Error:', err);
+      window.print();
+    } finally {
+      setExportingPDF(false);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   const fetchReportCards = async () => {
     if (!classId) return;
     setLoading(true);
     try {
       const res = await fetch(
-        `http://localhost:8080/api/report-cards/list?schoolId=${config.schoolId}&classId=${classId}&term=${term}&academicYear=${encodeURIComponent(academicYear)}`
+        `${import.meta.env.VITE_API_URL}/api/report-cards/list?schoolId=${config.schoolId}&classId=${classId}&term=${term}&academicYear=${encodeURIComponent(academicYear)}`
       );
       const data = await res.json();
       // The list returns { id, studentId, studentName, termAverage, rank, status, data: ReportCardFull }
@@ -63,7 +95,7 @@ export default function AdminReportCardGenerator({ config, accent }) {
     setGenerating(true);
     setMessage({ text: '', type: '' });
     try {
-      const res = await fetch(`http://localhost:8080/api/report-cards/generate-bulk`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/report-cards/generate-bulk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -89,29 +121,18 @@ export default function AdminReportCardGenerator({ config, accent }) {
 
   const handlePublish = async (id) => {
     try {
-      await fetch(`http://localhost:8080/api/report-cards/${id}/publish`, { method: 'PUT' });
+      await fetch(`${import.meta.env.VITE_API_URL}/api/report-cards/${id}/publish`, { method: 'PUT' });
       fetchReportCards();
     } catch (e) {
       console.error(e);
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   const selectedClassName = classes.find(c => (c.id || c.ID) === classId)?.name || '';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Print styles */}
       <style>{`
-        @media print {
-          body > *:not(.print-root) { display: none !important; }
-          .print-root { display: block !important; }
-          .no-print { display: none !important; }
-        }
-        .no-print {}
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .spin { animation: spin 1s linear infinite; }
       `}</style>
@@ -286,13 +307,15 @@ export default function AdminReportCardGenerator({ config, accent }) {
           <ReportCardControls
             accent={accent}
             onPrint={handlePrint}
+            onExportPDF={handleExportPDF}
+            exportingPDF={exportingPDF}
             isEditing={isEditing}
             onToggleEdit={() => setIsEditing(v => !v)}
             customFields={customFields}
             onFieldChange={(key, val) => setCustomFields(prev => ({ ...prev, [key]: val }))}
           />
 
-          <div className="print-main" style={{ marginTop: 16 }}>
+          <div className="print-main" ref={printRootRef} style={{ marginTop: 16 }}>
             <ReportCardView
               reportCards={selectedCard ? [selectedCard] : reportCards}
               accent={accent}

@@ -26,11 +26,11 @@ export default function TeacherMarkEntryForm({ config, myClasses, accent }) {
     setMessage({ text: '', type: '' });
     try {
       // 1. Fetch enrolled students
-      const enrRes = await fetch(`http://localhost:8080/api/enrollments?schoolId=${config.schoolId}&classId=${classId}`);
+      const enrRes = await fetch(`${import.meta.env.VITE_API_URL}/api/enrollments?schoolId=${config.schoolId}&classId=${classId}`);
       const enrollments = await enrRes.json();
       
       // 2. Fetch existing marks for this class, subject, term
-      const marksRes = await fetch(`http://localhost:8080/api/marks/teacher?schoolId=${config.schoolId}&classId=${classId}&subjectId=${subjectId}&term=${term}&academicYear=${academicYear}&teacherId=${config.id}`);
+      const marksRes = await fetch(`${import.meta.env.VITE_API_URL}/api/marks/teacher?schoolId=${config.schoolId}&classId=${classId}&subjectId=${subjectId}&term=${term}&academicYear=${academicYear}&teacherId=${config.id}`);
       const existingMarks = await marksRes.json();
       
       const stList = Array.isArray(enrollments) ? enrollments : [];
@@ -97,7 +97,7 @@ export default function TeacherMarkEntryForm({ config, myClasses, accent }) {
     };
 
     try {
-      const res = await fetch(`http://localhost:8080/api/marks/save-batch`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/marks/save-batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

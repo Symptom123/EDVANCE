@@ -1,8 +1,8 @@
 import React from 'react';
-import { Printer, Edit3, Check, Download } from 'lucide-react';
+import { Printer, Edit3, Check, Download, Loader2 } from 'lucide-react';
 import { btnStyle } from '../styles/portalTheme';
 
-export default function ReportCardControls({ accent, onPrint, isEditing, onToggleEdit, customFields, onFieldChange }) {
+export default function ReportCardControls({ accent, onPrint, onExportPDF, exportingPDF, isEditing, onToggleEdit, customFields, onFieldChange }) {
   const editInputStyle = {
     border: '1.5px solid ' + accent,
     borderRadius: 6,
@@ -52,18 +52,25 @@ export default function ReportCardControls({ accent, onPrint, isEditing, onToggl
             <Printer size={15} /> Print All
           </button>
           <button
-            onClick={onPrint}
+            onClick={onExportPDF || onPrint}
+            disabled={exportingPDF}
             style={{
               ...btnStyle('#1e293b'),
               background: '#1e293b',
               color: '#fff',
               display: 'flex', alignItems: 'center', gap: 6,
+              opacity: exportingPDF ? 0.75 : 1,
+              cursor: exportingPDF ? 'wait' : 'pointer'
             }}
           >
-            <Download size={15} /> Export PDF
+            {exportingPDF ? (
+              <><Loader2 size={15} className="spin" /> Generating PDF...</>
+            ) : (
+              <><Download size={15} /> Export PDF</>
+            )}
           </button>
           <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 4 }}>
-            {isEditing ? '✏️ Editing mode active — changes apply to all cards' : 'Click "Customize Report" to edit headers before printing'}
+            {exportingPDF ? '⏳ Generating multi-page high-resolution PDF, please wait...' : isEditing ? '✏️ Editing mode active — changes apply to all cards' : 'Click "Customize Report" to edit headers before printing or exporting'}
           </span>
         </div>
 

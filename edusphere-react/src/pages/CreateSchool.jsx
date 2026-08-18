@@ -50,7 +50,7 @@ const CreateSchool = () => {
         configJson: JSON.stringify({ roles: config.roles, modules: config.modules })
       };
 
-      const res = await fetch('http://localhost:8080/api/schools', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/schools`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

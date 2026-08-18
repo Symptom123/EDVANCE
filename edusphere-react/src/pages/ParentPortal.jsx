@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, CheckSquare, Award, Mail, LogOut, FileText, Send, X, Plus, User, Menu, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, Award, Mail, LogOut, FileText, Send, X, Plus, User, Menu, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Eye, Paperclip, Download, FileCheck } from 'lucide-react';
 import { T, rgba, navItemStyle, cardStyle, badge, inputStyle, btnStyle } from '../styles/portalTheme';
+import DocumentViewerModal, { triggerFileDownload, formatFileSize } from '../components/DocumentViewerModal';
 
 export default function ParentPortal() {
   const navigate = useNavigate();
@@ -25,6 +26,10 @@ export default function ParentPortal() {
   const [loadingMarks, setLoadingMarks] = useState(false);
   const [attendance, setAttendance] = useState([]);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [assignments, setAssignments] = useState([]);
+  const [studentSubmissions, setStudentSubmissions] = useState({});
+  const [loadingAssignments, setLoadingAssignments] = useState(false);
+  const [viewingDoc, setViewingDoc] = useState(null);
   const [messages, setMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [teachers, setTeachers] = useState([]);
@@ -38,7 +43,7 @@ export default function ParentPortal() {
 
   const fetchChildren = async (parentId) => {
     try {
-      const API = 'http://localhost:8080';
+      const API = import.meta.env.VITE_API_URL;
       const res = await fetch(`${API}/api/parents/${parentId}/children`);
       const data = await res.json();
       setChildren(data || []);
@@ -51,7 +56,7 @@ export default function ParentPortal() {
   const fetchMessages = async (userId) => {
     try {
       setLoadingMessages(true);
-      const API = 'http://localhost:8080';
+      const API = import.meta.env.VITE_API_URL;
       const res = await fetch(`${API}/api/messages?userId=${userId}&box=inbox`);
       const data = await res.json();
       setMessages(data || []);
@@ -73,7 +78,7 @@ export default function ParentPortal() {
     if (!selectedChild) return;
     const fetchChildData = async () => {
       const { ID: studentId, schoolId } = selectedChild;
-      const API = 'http://localhost:8080';
+      const API = import.meta.env.VITE_API_URL;
       
       setLoadingDashboard(true);
       fetch(`${API}/api/dashboard/student/${studentId}?schoolId=${schoolId}`)
@@ -95,6 +100,24 @@ export default function ParentPortal() {
         .then(d => setAttendance(d || []))
         .catch(console.error)
         .finally(() => setLoadingAttendance(false));
+
+      setLoadingAssignments(true);
+      fetch(`${API}/api/assignments?schoolId=${schoolId}&studentId=${studentId}`)
+        .then(r => r.json())
+        .then(d => setAssignments(d || []))
+        .catch(console.error)
+        .finally(() => setLoadingAssignments(false));
+
+      fetch(`${API}/api/assignments/student-submissions?studentId=${studentId}`)
+        .then(r => r.json())
+        .then(d => {
+          const map = {};
+          if (Array.isArray(d)) {
+            d.forEach(s => { map[s.assignmentId] = s; });
+          }
+          setStudentSubmissions(map);
+        })
+        .catch(console.error);
         
       fetch(`${API}/api/users?schoolId=${schoolId}&role=Teacher`)
         .then(r => r.json())
@@ -108,7 +131,7 @@ export default function ParentPortal() {
     e.preventDefault();
     setIsLinking(true); setLinkError(''); setLinkSuccess('');
     try {
-      const API = 'http://localhost:8080';
+      const API = import.meta.env.VITE_API_URL;
       const res = await fetch(`${API}/api/parents/link-child`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ parentId: config.userId, childEmail: linkChildEmail, childPass: linkChildPass })
@@ -127,7 +150,7 @@ export default function ParentPortal() {
 
   const markRead = async (msgId) => {
     try {
-      const API = 'http://localhost:8080';
+      const API = import.meta.env.VITE_API_URL;
       await fetch(`${API}/api/messages/${msgId}/read`, { method: 'PUT' });
       setMessages(msgs => msgs.map(m => m.id === msgId ? { ...m, read: true } : m));
     } catch(err) { console.error(err); }
@@ -138,7 +161,7 @@ export default function ParentPortal() {
     if (!composeRecip || !composeSubject || !composeBody) return;
     setSendingMessage(true);
     try {
-      const API = 'http://localhost:8080';
+      const API = import.meta.env.VITE_API_URL;
       const payload = {
         schoolId: selectedChild.schoolId,
         senderId: config.userId,
@@ -175,6 +198,7 @@ export default function ParentPortal() {
 
   const navItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'assignments', label: 'Assignments', icon: FileText },
     { id: 'attendance', label: 'Attendance', icon: CheckSquare },
     { id: 'grades', label: 'Grades', icon: Award },
     { id: 'messages', label: 'Messages', icon: Mail },
@@ -361,12 +385,144 @@ export default function ParentPortal() {
     </div>
   );
 
+  const renderAssignments = () => {
+    const now = new Date();
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div>
+          <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Coursework</p>
+          <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>{selectedChild.name}'s Assignments</h1>
+          <p style={{ color: T.muted, fontSize: 14, margin: '6px 0 0' }}>Review assigned homework, teacher worksheets, turned-in files, and grading feedback.</p>
+        </div>
+
+        {loadingAssignments ? (
+          <p style={{ color: T.muted }}>Loading assignments...</p>
+        ) : assignments.length === 0 ? (
+          <div style={{ ...cardStyle, textAlign: 'center', padding: '60px 20px' }}>
+            <FileText size={36} style={{ color: T.light, marginBottom: 12 }} />
+            <h3 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 6px', color: T.text }}>No Assignments Found</h3>
+            <p style={{ color: T.muted, fontSize: 14 }}>No assignments are currently posted for {selectedChild.name}'s classes.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
+            {assignments.map((a, i) => {
+              const sub = studentSubmissions[a.id || a.ID];
+              const isOverdue = new Date(a.dueDate) < now && !sub;
+              const isGraded = sub && sub.status === 'graded';
+              const isSubmitted = sub && sub.status === 'submitted';
+
+              return (
+                <div key={a.id || i} style={{ ...cardStyle, borderLeft: `4px solid ${isGraded ? '#10b981' : isSubmitted ? '#3b82f6' : isOverdue ? '#ef4444' : accent}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                      <span style={badge(accent, rgba(accent, 0.1))}>{a.className || 'Class'}</span>
+                      {isGraded ? (
+                        <span style={badge('#15803d', '#dcfce7')}>Score: {sub.grade}/{a.maxPoints || 20}</span>
+                      ) : isSubmitted ? (
+                        <span style={badge('#1d4ed8', '#dbeafe')}>✓ Turned In</span>
+                      ) : isOverdue ? (
+                        <span style={badge('#dc2626', '#fee2e2')}>Overdue</span>
+                      ) : (
+                        <span style={badge('#d97706', '#fef9c3')}>Due {new Date(a.dueDate).toLocaleDateString()}</span>
+                      )}
+                    </div>
+
+                    <h3 style={{ fontFamily: T.fontSans, fontWeight: 700, fontSize: 16, margin: '8px 0 4px', color: T.text }}>{a.title}</h3>
+                    <p style={{ color: T.muted, fontSize: 12, margin: '0 0 10px' }}>Teacher: {a.teacherName || 'Instructor'} | Max: {a.maxPoints || 20} pts</p>
+                    <p style={{ color: T.text, fontSize: 14, lineHeight: 1.5, margin: '0 0 12px' }}>{a.description}</p>
+
+                    {/* Teacher Attached Worksheet */}
+                    {a.fileUrl && (
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                          <Paperclip size={14} color={accent} style={{ flexShrink: 0 }} />
+                          <div style={{ overflow: 'hidden' }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '170px' }}>
+                              {a.fileName || 'Teacher Worksheet'}
+                            </span>
+                            {a.fileSize > 0 && <span style={{ fontSize: 11, color: T.muted }}>{formatFileSize(a.fileSize)}</span>}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button
+                            type="button"
+                            onClick={() => setViewingDoc({ url: a.fileUrl, fileName: a.fileName, fileSize: a.fileSize, fileType: a.fileType })}
+                            style={{ ...btnStyle(accent, true), padding: '4px 8px', fontSize: 11, borderRadius: 4 }}
+                          >
+                            <Eye size={12} /> View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => triggerFileDownload(a.fileUrl, a.fileName)}
+                            style={{ ...btnStyle(accent), padding: '4px 8px', fontSize: 11, borderRadius: 4 }}
+                          >
+                            <Download size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Teacher Feedback Callout */}
+                    {isGraded && sub.feedback && (
+                      <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 12px', margin: '0 0 12px' }}>
+                        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#15803d' }}>Teacher's Feedback:</p>
+                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#166534', fontStyle: 'italic' }}>"{sub.feedback}"</p>
+                      </div>
+                    )}
+
+                    {/* Child's Submission Preview */}
+                    {sub && (
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px', margin: '0 0 8px', fontSize: 12 }}>
+                        {sub.content && (
+                          <div style={{ color: '#64748b', marginBottom: sub.fileUrl ? 8 : 0 }}>
+                            <strong style={{ color: T.text }}>Submitted Work:</strong> {sub.content.length > 80 ? sub.content.slice(0, 80) + '...' : sub.content}
+                          </div>
+                        )}
+                        {sub.fileUrl && (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#ffffff', padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                              <FileCheck size={14} color="#16a34a" />
+                              <span style={{ fontWeight: 600, color: T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>
+                                {sub.fileName || 'Student Submission'}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button
+                                type="button"
+                                onClick={() => setViewingDoc({ url: sub.fileUrl, fileName: sub.fileName, fileSize: sub.fileSize, fileType: sub.fileType })}
+                                style={{ ...btnStyle(accent, true), padding: '2px 6px', fontSize: 11, borderRadius: 4 }}
+                              >
+                                View
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => triggerFileDownload(sub.fileUrl, sub.fileName)}
+                                style={{ ...btnStyle(accent), padding: '2px 6px', fontSize: 11, borderRadius: 4 }}
+                              >
+                                Download
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderContent = () => {
     if (children.length === 0) return <div style={{ padding: '44px 52px' }}><p style={{color: T.muted}}>Select a child from the sidebar or link a new child</p></div>;
     if (!selectedChild) return <div style={{ padding: '44px 52px' }}><p style={{color: T.muted}}>Select a child from the sidebar</p></div>;
 
     switch (activeTab) {
       case 'overview': return renderOverview();
+      case 'assignments': return renderAssignments();
       case 'attendance': return renderAttendance();
       case 'grades': return renderGrades();
       case 'messages': return renderMessages();
@@ -455,6 +611,9 @@ export default function ParentPortal() {
           </div>
         )}
       </div>}
+
+      {/* DOCUMENT VIEWER MODAL */}
+      <DocumentViewerModal file={viewingDoc} onClose={() => setViewingDoc(null)} accent={accent} />
     </div>
   );
 }

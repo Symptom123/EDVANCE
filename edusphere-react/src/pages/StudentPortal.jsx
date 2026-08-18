@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Calendar, BookOpen, FileText, Award, CheckSquare, Mail, User, LogOut, Plus, Clock, ChevronRight, Bell, Download, X, Menu, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { LayoutDashboard, Calendar, BookOpen, FileText, Award, CheckSquare, Mail, User, LogOut, Plus, Clock, ChevronRight, Bell, Download, X, Menu, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Eye, Paperclip, FileCheck } from 'lucide-react';
 import { T, rgba, navItemStyle, cardStyle, inputStyle, btnStyle, badge } from '../styles/portalTheme';
+import DocumentViewerModal, { triggerFileDownload, formatFileSize } from '../components/DocumentViewerModal';
+import FileUploadDropzone from '../components/FileUploadDropzone';
 
 export default function StudentPortal() {
   const navigate = useNavigate();
@@ -24,6 +26,8 @@ export default function StudentPortal() {
   const [submittingAssign, setSubmittingAssign] = useState(null);
   const [submissionText, setSubmissionText] = useState('');
   const [submissionFileUrl, setSubmissionFileUrl] = useState('');
+  const [submissionDoc, setSubmissionDoc] = useState(null);
+  const [viewingDoc, setViewingDoc] = useState(null);
   const [isSubmittingWork, setIsSubmittingWork] = useState(false);
   const [submitSuccessMsg, setSubmitSuccessMsg] = useState('');
   const [inboxItems, setInboxItems] = useState([]);
@@ -44,7 +48,7 @@ export default function StudentPortal() {
   const [msgBody, setMsgBody] = useState('');
   const [msgSending, setMsgSending] = useState(false);
 
-  const API = 'http://localhost:8080';
+  const API = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     const raw = localStorage.getItem('edvance_school_config');
@@ -512,15 +516,37 @@ export default function StudentPortal() {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {classAssignments.map((asm, idx) => (
-                      <div key={idx} style={{ padding: '14px', borderRadius: 8, background: '#fff', border: `1px solid ${T.borderLight}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div key={idx} style={{ padding: '14px', borderRadius: 8, background: '#fff', border: `1px solid ${T.borderLight}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                         <div>
                           <strong style={{ fontSize: 14, color: T.text, display: 'block' }}>{asm.title}</strong>
-                          <p style={{ margin: '2px 0 0', fontSize: 12, color: T.muted }}>Due: {new Date(asm.dueDate).toLocaleDateString()}</p>
+                          <p style={{ margin: '2px 0 0', fontSize: 12, color: T.muted }}>Due: {new Date(asm.dueDate).toLocaleDateString()} | Max: {asm.maxPoints || 20} pts</p>
                           {asm.description && <p style={{ margin: '6px 0 0', fontSize: 13, color: T.text }}>{asm.description}</p>}
+                          {asm.fileUrl && (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 6, background: '#f1f5f9', padding: '3px 8px', borderRadius: 6, fontSize: 12, color: '#475569' }}>
+                              <Paperclip size={12} color={accent} />
+                              <span style={{ fontWeight: 600 }}>{asm.fileName || 'Assignment Document'}</span>
+                              {asm.fileSize > 0 && <span>({formatFileSize(asm.fileSize)})</span>}
+                            </div>
+                          )}
                         </div>
-                        <button onClick={() => handleDownloadAssignment(asm)} style={{ ...btnStyle(accent, true), padding: '6px 12px', fontSize: 12 }}>
-                          <Download size={13} /> Download
-                        </button>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          {asm.fileUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setViewingDoc({ url: asm.fileUrl, fileName: asm.fileName, fileSize: asm.fileSize, fileType: asm.fileType })}
+                              style={{ ...btnStyle(accent, true), padding: '6px 10px', fontSize: 12, borderRadius: 6 }}
+                            >
+                              <Eye size={13} /> View
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadAssignment(asm)}
+                            style={{ ...btnStyle(accent, !asm.fileUrl), padding: '6px 12px', fontSize: 12, borderRadius: 6 }}
+                          >
+                            <Download size={13} /> Download
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -534,6 +560,10 @@ export default function StudentPortal() {
   };
 
   const handleDownloadAssignment = (a) => {
+    if (a.fileUrl) {
+      triggerFileDownload(a.fileUrl, a.fileName);
+      return;
+    }
     const text = `Assignment: ${a.title}\nClass: ${a.className}\nDue Date: ${a.dueDate}\n\nDescription:\n${a.description}`;
     const blob = new Blob([text], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -553,6 +583,11 @@ export default function StudentPortal() {
     const schoolId = config.schoolId || '';
     
     try {
+      const finalFileUrl = submissionDoc ? submissionDoc.fileUrl : submissionFileUrl;
+      const finalFileName = submissionDoc ? submissionDoc.fileName : (submissionFileUrl ? submissionFileUrl.split('/').pop() : '');
+      const finalFileSize = submissionDoc ? submissionDoc.fileSize : 0;
+      const finalFileType = submissionDoc ? submissionDoc.fileType : '';
+
       const res = await fetch(`${API}/api/assignments/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -563,7 +598,10 @@ export default function StudentPortal() {
           studentId: sid,
           studentName: config.name || 'Student',
           content: submissionText,
-          fileUrl: submissionFileUrl
+          fileUrl: finalFileUrl,
+          fileName: finalFileName,
+          fileSize: finalFileSize,
+          fileType: finalFileType
         })
       });
       if (res.ok) {
@@ -572,6 +610,7 @@ export default function StudentPortal() {
         setSubmittingAssign(null);
         setSubmissionText('');
         setSubmissionFileUrl('');
+        setSubmissionDoc(null);
         fetchData();
       } else {
         const txt = await res.text();
@@ -633,20 +672,121 @@ export default function StudentPortal() {
 
                     <h3 style={{ fontFamily: T.fontSans, fontWeight: 700, fontSize: 16, margin: '8px 0 4px', color: T.text }}>{a.title}</h3>
                     <p style={{ color: T.muted, fontSize: 12, margin: '0 0 10px' }}>Teacher: {a.teacherName || 'Instructor'} | Max: {a.maxPoints || 20} pts</p>
-                    <p style={{ color: T.text, fontSize: 14, lineHeight: 1.5, margin: '0 0 14px' }}>{a.description}</p>
+                    <p style={{ color: T.text, fontSize: 14, lineHeight: 1.5, margin: '0 0 12px' }}>{a.description}</p>
+
+                    {/* Teacher Attached Document */}
+                    {a.fileUrl && (
+                      <div
+                        style={{
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: 8,
+                          padding: '10px 12px',
+                          marginBottom: 12,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 8
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                          <Paperclip size={15} color={accent} style={{ flexShrink: 0 }} />
+                          <div style={{ overflow: 'hidden' }}>
+                            <span
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: T.text,
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                display: 'block',
+                                maxWidth: '160px'
+                              }}
+                              title={a.fileName || 'Assignment Sheet'}
+                            >
+                              {a.fileName || 'Assignment Sheet'}
+                            </span>
+                            {a.fileSize > 0 && (
+                              <span style={{ fontSize: 11, color: T.muted }}>
+                                {formatFileSize(a.fileSize)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button
+                            type="button"
+                            onClick={() => setViewingDoc({ url: a.fileUrl, fileName: a.fileName, fileSize: a.fileSize, fileType: a.fileType })}
+                            style={{
+                              ...btnStyle(accent, true),
+                              padding: '4px 8px',
+                              fontSize: 11,
+                              borderRadius: 6
+                            }}
+                            title="View Document"
+                          >
+                            <Eye size={12} /> View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => triggerFileDownload(a.fileUrl, a.fileName)}
+                            style={{
+                              ...btnStyle(accent),
+                              padding: '4px 8px',
+                              fontSize: 11,
+                              borderRadius: 6
+                            }}
+                            title="Download Document"
+                          >
+                            <Download size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Graded Feedback Callout */}
                     {isGraded && sub.feedback && (
-                      <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 12px', margin: '0 0 14px' }}>
+                      <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 12px', margin: '0 0 12px' }}>
                         <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#15803d' }}>Teacher's Feedback:</p>
                         <p style={{ margin: '4px 0 0', fontSize: 13, color: '#166534', fontStyle: 'italic' }}>"{sub.feedback}"</p>
                       </div>
                     )}
 
-                    {/* Submitted text preview */}
-                    {sub && sub.content && (
-                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 10px', margin: '0 0 14px', fontSize: 12, color: '#64748b' }}>
-                        <strong>Your answer:</strong> {sub.content.length > 80 ? sub.content.slice(0, 80) + '...' : sub.content}
+                    {/* Submitted text & file summary */}
+                    {sub && (
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px', margin: '0 0 12px', fontSize: 12 }}>
+                        {sub.content && (
+                          <div style={{ color: '#64748b', marginBottom: sub.fileUrl ? 8 : 0 }}>
+                            <strong style={{ color: T.text }}>Your Solution:</strong> {sub.content.length > 80 ? sub.content.slice(0, 80) + '...' : sub.content}
+                          </div>
+                        )}
+                        {sub.fileUrl && (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#ffffff', padding: '6px 10px', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                              <FileCheck size={14} color="#16a34a" />
+                              <span style={{ fontWeight: 600, color: T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>
+                                {sub.fileName || 'Turned-in File'}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button
+                                type="button"
+                                onClick={() => setViewingDoc({ url: sub.fileUrl, fileName: sub.fileName, fileSize: sub.fileSize, fileType: sub.fileType })}
+                                style={{ ...btnStyle(accent, true), padding: '2px 6px', fontSize: 11, borderRadius: 4 }}
+                              >
+                                View
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => triggerFileDownload(sub.fileUrl, sub.fileName)}
+                                style={{ ...btnStyle(accent), padding: '2px 6px', fontSize: 11, borderRadius: 4 }}
+                              >
+                                Download
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -657,10 +797,15 @@ export default function StudentPortal() {
                         setSubmittingAssign(a);
                         setSubmissionText(sub ? sub.content : '');
                         setSubmissionFileUrl(sub ? sub.fileUrl : '');
+                        if (sub && sub.fileUrl) {
+                          setSubmissionDoc({ fileUrl: sub.fileUrl, fileName: sub.fileName, fileSize: sub.fileSize, fileType: sub.fileType });
+                        } else {
+                          setSubmissionDoc(null);
+                        }
                       }}
                       style={{ ...btnStyle(accent), flex: 1, justifyContent: 'center', fontSize: 13, padding: '8px 12px' }}
                     >
-                      {isGraded ? 'Review Submission' : isSubmitted ? 'Edit / Resubmit' : 'Turn In Work'}
+                      {isGraded ? 'Review Submission' : isSubmitted ? 'Edit / Resubmit Work' : 'Turn In Work'}
                     </button>
                     <button onClick={() => handleDownloadAssignment(a)} style={{ ...btnStyle(accent, true), padding: '8px 10px', fontSize: 12 }} title="Download Instructions">
                       <Download size={14} />
@@ -674,48 +819,76 @@ export default function StudentPortal() {
 
         {/* SUBMIT ASSIGNMENT WORK MODAL */}
         {submittingAssign && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
-            <div style={{ ...cardStyle, width: 500, maxWidth: '92%', position: 'relative', maxHeight: '88vh', overflowY: 'auto' }}>
-              <button onClick={() => setSubmittingAssign(null)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: T.muted }}><X size={18} /></button>
-              <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 4px', fontSize: 22, color: T.text }}>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16 }}>
+            <div style={{ ...cardStyle, width: 560, maxWidth: '94%', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
+              <button onClick={() => { setSubmittingAssign(null); setSubmissionDoc(null); }} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: T.muted }}><X size={18} /></button>
+              <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 4px', fontSize: 24, color: T.text }}>
                 {submittingAssign.title}
               </h2>
               <p style={{ color: T.muted, fontSize: 13, margin: '0 0 14px' }}>
                 Class: {submittingAssign.className} | Due: {new Date(submittingAssign.dueDate).toLocaleDateString()} | Max: {submittingAssign.maxPoints || 20} pts
               </p>
 
-              <div style={{ background: '#faf9f7', padding: 12, borderRadius: 8, border: `1px solid ${T.borderLight}`, marginBottom: 16, fontSize: 13, color: T.text }}>
-                <strong>Assignment Instructions:</strong>
-                <p style={{ margin: '6px 0 0', whiteSpace: 'pre-wrap' }}>{submittingAssign.description}</p>
+              {/* Assignment Instructions & Teacher Attachment Box */}
+              <div style={{ background: '#faf9f7', padding: 14, borderRadius: 10, border: `1px solid ${T.borderLight}`, marginBottom: 16, fontSize: 13, color: T.text }}>
+                <strong style={{ display: 'block', marginBottom: 4 }}>Assignment Instructions:</strong>
+                <p style={{ margin: '0 0 10px', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{submittingAssign.description}</p>
+
+                {submittingAssign.fileUrl && (
+                  <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                      <Paperclip size={14} color={accent} />
+                      <span style={{ fontWeight: 600, fontSize: 12, color: T.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '240px' }}>
+                        {submittingAssign.fileName || 'Teacher Worksheet / Guide'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => setViewingDoc({ url: submittingAssign.fileUrl, fileName: submittingAssign.fileName, fileSize: submittingAssign.fileSize, fileType: submittingAssign.fileType })}
+                        style={{ ...btnStyle(accent, true), padding: '4px 8px', fontSize: 11, borderRadius: 4 }}
+                      >
+                        <Eye size={12} /> View
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => triggerFileDownload(submittingAssign.fileUrl, submittingAssign.fileName)}
+                        style={{ ...btnStyle(accent), padding: '4px 8px', fontSize: 11, borderRadius: 4 }}
+                      >
+                        <Download size={12} /> Download
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <form onSubmit={handleSubmitAssignmentWork} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>Your Solution / Answer Text</label>
                   <textarea
-                    required
-                    rows={6}
+                    rows={4}
                     value={submissionText}
                     onChange={e => setSubmissionText(e.target.value)}
                     placeholder="Type your complete solution, essay, or homework response here..."
                     style={{ ...inputStyle, resize: 'vertical' }}
                   />
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>File / Drive Link (Optional)</label>
-                  <input
-                    type="url"
-                    value={submissionFileUrl}
-                    onChange={e => setSubmissionFileUrl(e.target.value)}
-                    placeholder="https://drive.google.com/file/..."
-                    style={inputStyle}
-                  />
-                </div>
+
+                {/* Document / Homework File Upload */}
+                <FileUploadDropzone
+                  label="Upload Homework Document / Image"
+                  hint="Attach PDF, Word, PowerPoint, Excel, Photo, or Text file of your work"
+                  file={submissionDoc}
+                  onFileChange={setSubmissionDoc}
+                  accent={accent}
+                  onPreview={(f) => setViewingDoc(f)}
+                />
+
                 <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-                  <button type="submit" disabled={isSubmittingWork} style={{ ...btnStyle(accent), flex: 1, justifyContent: 'center' }}>
+                  <button type="submit" disabled={isSubmittingWork || (!submissionText.trim() && !submissionDoc && !submissionFileUrl.trim())} style={{ ...btnStyle(accent), flex: 1, justifyContent: 'center' }}>
                     {isSubmittingWork ? 'Submitting...' : 'Submit Assignment to Teacher'}
                   </button>
-                  <button type="button" onClick={() => setSubmittingAssign(null)} style={{ ...btnStyle('#6b7280'), flex: 1, justifyContent: 'center' }}>Cancel</button>
+                  <button type="button" onClick={() => { setSubmittingAssign(null); setSubmissionDoc(null); }} style={{ ...btnStyle('#6b7280'), flex: 1, justifyContent: 'center' }}>Cancel</button>
                 </div>
               </form>
             </div>
@@ -1073,6 +1246,9 @@ export default function StudentPortal() {
           )}
         </div>
       </div>}
+
+      {/* DOCUMENT VIEWER MODAL */}
+      <DocumentViewerModal file={viewingDoc} onClose={() => setViewingDoc(null)} accent={accent} />
     </div>
   );
 }

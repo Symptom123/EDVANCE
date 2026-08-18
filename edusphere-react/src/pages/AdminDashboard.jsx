@@ -13,7 +13,7 @@ import ReportCardView from '../components/ReportCardView';
 import AdminReportCardGenerator from '../components/AdminReportCardGenerator';
 import * as XLSX from 'xlsx';
 
-const API = 'http://localhost:8080';
+const API = import.meta.env.VITE_API_URL;
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
