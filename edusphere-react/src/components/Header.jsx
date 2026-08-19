@@ -92,13 +92,11 @@ const Header = () => {
             <div className="main-nav-inner">
               {/* Brand Logo */}
               <a className="brand-logo" href="/" aria-label="Edvance Home">
-                <div className="brand-icon-box">
-                  <span className="brand-letter">E</span>
-                </div>
-                <div className="brand-text-wrap">
-                  <span className="brand-title">Edv<span className="brand-title-accent">ance</span></span>
-                  <span className="brand-tag">School System</span>
-                </div>
+                <img
+                  src="/images/logo-horizontal.png"
+                  alt="Edvance — Global Educational Solutions"
+                  className="brand-logo-img"
+                />
               </a>
 
               {/* Desktop Search Field */}
@@ -163,12 +161,13 @@ const Header = () => {
       >
         <div className="mobile-menu-sheet">
           <div className="mobile-sheet-header">
-            <div className="brand-logo">
-              <div className="brand-icon-box">
-                <span className="brand-letter">E</span>
-              </div>
-              <span className="brand-title">Edv<span className="brand-title-accent">ance</span></span>
-            </div>
+            <a className="brand-logo" href="/">
+              <img
+                src="/images/logo-horizontal.png"
+                alt="Edvance"
+                className="brand-logo-img brand-logo-img--mobile"
+              />
+            </a>
             <button className="mobile-close-btn" onClick={() => setMenuOpen(false)}>
               <X size={20} />
             </button>

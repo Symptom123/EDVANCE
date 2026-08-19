@@ -7,9 +7,13 @@ const Footer = () => {
         <div className="footer-main">
           {/* Brand Col */}
           <div className="footer-brand-col">
-            <span className="footer-wordmark">
-              Edv<span>ance</span>
-            </span>
+            <a href="/" className="footer-logo-link">
+              <img
+                src="/images/logo-full.png"
+                alt="Edvance — Global Educational Solutions"
+                className="footer-logo-img"
+              />
+            </a>
             <p className="footer-tagline">
               The enterprise school management standard trusted by 2,400+ leading institutions across sub-Saharan Africa.
             </p>

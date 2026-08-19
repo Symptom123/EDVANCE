@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { ArrowRight, Star, Layers, Calculator, FileText, Smartphone, Building2, Check, ShieldCheck, Sparkles } from 'lucide-react';
+import { 
+  ArrowRight, Star, Layers, Calculator, FileText, Smartphone, Building2, 
+  Check, ShieldCheck, Sparkles, CreditCard, Clock, CheckCircle2, TrendingUp, Zap
+} from 'lucide-react';
 
 const solutions = [
   {
@@ -15,6 +18,8 @@ const solutions = [
     meta: ['Real-time Ranking', 'Coefficient Auto-Sum', 'Offline Validation'],
     author: { name: 'Academic Evaluation Engine', role: 'MINESEC Standard' },
     statusBadge: 'Core Module',
+    previewType: 'calc',
+    highlightMetric: '100% Accuracy',
   },
   {
     id: 'reports',
@@ -29,6 +34,8 @@ const solutions = [
     meta: ['Tamper-Proof QR Seal', 'Batch PDF Export', 'Custom Crest & Signature'],
     author: { name: 'Official Registrar Engine', role: 'Bilingual System' },
     statusBadge: 'Core Module',
+    previewType: 'report',
+    highlightMetric: 'Instant PDF',
   },
   {
     id: 'parent',
@@ -43,6 +50,8 @@ const solutions = [
     meta: ['SMS & WhatsApp Gateway', 'Instant Push Feed', 'Tuition Ledger'],
     author: { name: 'Parent Engagement Suite', role: 'Family Network' },
     statusBadge: 'Core Module',
+    previewType: 'mobile',
+    highlightMetric: 'Instant SMS',
   },
   {
     id: 'campus',
@@ -57,15 +66,49 @@ const solutions = [
     meta: ['Centralized Roster', 'Audit Trail Logging', 'District Analytics'],
     author: { name: 'District Governance Suite', role: 'Enterprise Tier' },
     statusBadge: 'Enterprise Ready',
+    previewType: 'campus',
+    highlightMetric: '99.9% Uptime',
   },
+  {
+    id: 'finance',
+    num: '05',
+    category: 'campus',
+    cornerBadge: 'MoMo & Cash',
+    rating: '4.9',
+    reviews: '340+ schools',
+    title: 'Automated Tuition Ledger & Mobile Money',
+    desc: 'Track fee installments, generate official stamped receipts, and reconcile MTN / Orange Money payments automatically with zero accounting discrepancies.',
+    tags: ['MTN MoMo', 'Orange Money', 'Receipt Printing', 'Arrears Tracking'],
+    meta: ['Automated Reminders', 'Audit Ledger', 'Cashier Control'],
+    author: { name: 'Institutional Bursary Suite', role: 'Finance Engine' },
+    statusBadge: 'Finance Module',
+    previewType: 'finance',
+    highlightMetric: '0 Discrepancies',
+  },
+  {
+    id: 'attendance',
+    num: '06',
+    category: 'grading',
+    cornerBadge: 'Sequence Tracker',
+    rating: '4.9',
+    reviews: '280+ schools',
+    title: 'Syllabus & Sequence Coverage Analytics',
+    desc: 'Track pedagogical curriculum completion rates across all departments. Spot delayed subject coverage weeks before official national exams take place.',
+    tags: ['Syllabus Progress', 'Teacher Logbook', 'Inspection Ready'],
+    meta: ['Coverage Metrics', 'Department Audits', 'Discipline Log'],
+    author: { name: 'Academic Inspectorate Unit', role: 'Curriculum Standard' },
+    statusBadge: 'Analytics',
+    previewType: 'analytics',
+    highlightMetric: '100% On-Track',
+  }
 ];
 
 const categoryTabs = [
-  { id: 'all', label: 'All Modules', count: '04', icon: Layers },
-  { id: 'grading', label: 'Grade Engine', count: '01', icon: Calculator },
-  { id: 'reports', label: 'Report Cards', count: '02', icon: FileText },
-  { id: 'parent', label: 'Parent Portal', count: '03', icon: Smartphone },
-  { id: 'campus', label: 'Multi-Campus', count: '04', icon: Building2 },
+  { id: 'all', label: 'All Modules', count: '06', icon: Layers },
+  { id: 'grading', label: 'Grade Engine', count: '02', icon: Calculator },
+  { id: 'reports', label: 'Report Cards', count: '01', icon: FileText },
+  { id: 'parent', label: 'Parent Portal', count: '01', icon: Smartphone },
+  { id: 'campus', label: 'Campus & Finance', count: '02', icon: Building2 },
 ];
 
 const Features = () => {
@@ -77,27 +120,41 @@ const Features = () => {
 
   return (
     <section className="solution-section" id="solution">
-      <div className="container">
+      {/* ── Animated Background Visual Elements ── */}
+      <div className="solution-bg-fx" aria-hidden="true">
+        <div className="sol-orb sol-orb-1" />
+        <div className="sol-orb sol-orb-2" />
+        <div className="sol-grid-mesh" />
+        {/* Floating tech circuit shapes */}
+        <svg className="sol-circuit-svg" viewBox="0 0 1000 600" fill="none">
+          <path d="M50 100 H300 L350 150 H700" stroke="var(--teal-primary)" strokeWidth="1" strokeDasharray="6 6" opacity="0.15" />
+          <path d="M200 450 H600 L650 400 H950" stroke="var(--teal-primary)" strokeWidth="1" strokeDasharray="4 8" opacity="0.12" />
+          <circle cx="350" cy="150" r="4" fill="var(--teal-primary)" opacity="0.3" />
+          <circle cx="650" cy="400" r="4" fill="var(--orange-accent)" opacity="0.3" />
+        </svg>
+      </div>
+
+      <div className="container" style={{ position: 'relative', zIndex: 1 }}>
         {/* Section Header */}
         <div className="solution-header reveal">
           <div className="section-eyebrow-pill">
             <span className="eyebrow-dot" />
-            <span className="eyebrow-label">The Solution</span>
+            <span className="eyebrow-label">Integrated Platform</span>
           </div>
 
           <h2 className="section-headline">
-            How Edvance changes
+            How Edvance transforms
             <br />
-            <span className="text-blue">everything for your school</span>
+            <span className="text-teal">every layer of school operations</span>
           </h2>
 
           <p className="section-sub">
-            Four interconnected capabilities that eliminate manual work and give
-            every stakeholder — administrators, teachers, and parents — exactly what they need.
+            Modular, battle-tested capabilities designed specifically for African educational standards.
+            Eliminate manual friction for administrators, teachers, registrars, and parents.
           </p>
         </div>
 
-        {/* Category Selector Tabs (Tab-Selector Cards: Icon + Label + Count) */}
+        {/* Category Selector Tabs */}
         <div className="category-tabs-wrapper reveal reveal-delay-1">
           <div className="category-tabs-list">
             {categoryTabs.map((tab) => {
@@ -125,18 +182,23 @@ const Features = () => {
         {/* Dense Information-Rich Card Grid */}
         <div className="dense-card-grid">
           {filteredSolutions.map((s, i) => (
-            <div key={s.id} className={`dense-info-card reveal reveal-delay-${(i % 2) + 1}`}>
-              {/* Top Banner / Corner Status Badge & Star Rating */}
-              <div className="card-top-row">
-                <span className="card-corner-badge">{s.cornerBadge}</span>
+            <div key={s.id} className={`dense-info-card reveal reveal-delay-${(i % 3) + 1}`}>
+              {/* Card Header Preview Banner */}
+              <div className="card-mini-visual-banner">
+                <div className="banner-badge-left">
+                  <span className="card-corner-badge">{s.cornerBadge}</span>
+                  <span className="card-metric-tag">
+                    <Zap size={11} className="text-teal" />
+                    <span>{s.highlightMetric}</span>
+                  </span>
+                </div>
                 <div className="card-rating">
                   <div className="card-stars">
                     {[...Array(5)].map((_, idx) => (
-                      <Star key={idx} size={13} fill="#E8A23A" color="#E8A23A" />
+                      <Star key={idx} size={12} fill="#E8A23A" color="#E8A23A" />
                     ))}
                   </div>
                   <span className="rating-num">{s.rating}</span>
-                  <span className="rating-reviews">({s.reviews})</span>
                 </div>
               </div>
 
@@ -153,7 +215,7 @@ const Features = () => {
               <div className="card-meta-row">
                 {s.meta.map((m, mi) => (
                   <span key={mi} className="meta-pill">
-                    <Check size={11} className="meta-check text-blue" />
+                    <Check size={11} className="meta-check text-teal" />
                     <span>{m}</span>
                   </span>
                 ))}
@@ -166,7 +228,7 @@ const Features = () => {
                 ))}
               </div>
 
-              {/* Card Footer: Instructor / Author Avatar with Name and Price / Status Badge */}
+              {/* Card Footer: Author Avatar & Action Button */}
               <div className="card-footer-row">
                 <div className="card-author-block">
                   <div className="author-avatar-circle">
@@ -189,12 +251,20 @@ const Features = () => {
           ))}
         </div>
 
-        {/* Bottom CTA */}
-        <div className="reveal" style={{ marginTop: 48, textAlign: 'center' }}>
-          <a href="/register" className="btn btn-primary">
-            <span>See all features</span>
-            <ArrowRight size={16} className="btn-arrow-trailing" />
-          </a>
+        {/* Bottom CTA Banner inside Solution section */}
+        <div className="solution-bottom-banner reveal">
+          <div className="sol-banner-content">
+            <div className="sol-banner-text">
+              <h4>Ready to modernize your academic workflow?</h4>
+              <p>Join over 2,400+ forward-thinking schools using Edvance across sub-Saharan Africa.</p>
+            </div>
+            <div className="sol-banner-actions">
+              <a href="/register" className="btn btn-primary">
+                <span>Start Free Institutional Trial</span>
+                <ArrowRight size={16} className="btn-arrow-trailing" />
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -202,3 +272,4 @@ const Features = () => {
 };
 
 export default Features;
+

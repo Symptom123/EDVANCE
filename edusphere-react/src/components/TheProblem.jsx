@@ -4,11 +4,11 @@ import { CheckCircle2, AlertCircle, ArrowRight, ShieldCheck, Award } from 'lucid
 /* ── SVG Icons — redesigned with clean palette ── */
 const SpreadsheetIcon = () => (
   <svg width="36" height="36" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-    <rect x="4" y="4" width="32" height="32" rx="8" stroke="#1E5FD9" strokeWidth="1.75" fill="#F0F4FC"/>
-    <line x1="4" y1="14" x2="36" y2="14" stroke="#1E5FD9" strokeWidth="1.5"/>
-    <line x1="4" y1="24" x2="36" y2="24" stroke="#1E5FD9" strokeWidth="1.5"/>
-    <line x1="16" y1="4" x2="16" y2="36" stroke="#1E5FD9" strokeWidth="1.5"/>
-    <rect x="17" y="5" width="18" height="8" fill="#1E5FD9" opacity="0.15"/>
+    <rect x="4" y="4" width="32" height="32" rx="8" stroke="#2D8C8C" strokeWidth="1.75" fill="#EDF7F6"/>
+    <line x1="4" y1="14" x2="36" y2="14" stroke="#2D8C8C" strokeWidth="1.5"/>
+    <line x1="4" y1="24" x2="36" y2="24" stroke="#2D8C8C" strokeWidth="1.5"/>
+    <line x1="16" y1="4" x2="16" y2="36" stroke="#2D8C8C" strokeWidth="1.5"/>
+    <rect x="17" y="5" width="18" height="8" fill="#2D8C8C" opacity="0.15"/>
     <line x1="20" y1="19" x2="32" y2="19" stroke="#E8A23A" strokeWidth="2" strokeLinecap="round"/>
     <line x1="20" y1="29" x2="28" y2="29" stroke="#E8A23A" strokeWidth="2" strokeLinecap="round"/>
   </svg>
@@ -17,18 +17,18 @@ const SpreadsheetIcon = () => (
 const ClockIcon = () => (
   <svg width="36" height="36" viewBox="0 0 40 40" fill="none" aria-hidden="true">
     <circle cx="20" cy="20" r="16" stroke="#E8A23A" strokeWidth="1.75" fill="#FEF6EB"/>
-    <line x1="20" y1="20" x2="20" y2="10" stroke="#0F1E33" strokeWidth="2" strokeLinecap="round"/>
-    <line x1="20" y1="20" x2="28" y2="24" stroke="#0F1E33" strokeWidth="2" strokeLinecap="round"/>
-    <circle cx="20" cy="20" r="2.5" fill="#1E5FD9"/>
+    <line x1="20" y1="20" x2="20" y2="10" stroke="#1A2B4A" strokeWidth="2" strokeLinecap="round"/>
+    <line x1="20" y1="20" x2="28" y2="24" stroke="#1A2B4A" strokeWidth="2" strokeLinecap="round"/>
+    <circle cx="20" cy="20" r="2.5" fill="#2D8C8C"/>
   </svg>
 );
 
 const DisconnectedIcon = () => (
   <svg width="36" height="36" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-    <rect x="4" y="8" width="13" height="10" rx="3" stroke="#0F1E33" strokeWidth="1.5" fill="#F0F4FC"/>
-    <rect x="23" y="8" width="13" height="10" rx="3" stroke="#0F1E33" strokeWidth="1.5" fill="#F0F4FC"/>
-    <rect x="4" y="22" width="13" height="10" rx="3" stroke="#0F1E33" strokeWidth="1.5" fill="#F0F4FC"/>
-    <rect x="23" y="22" width="13" height="10" rx="3" stroke="#0F1E33" strokeWidth="1.5" fill="#F0F4FC"/>
+    <rect x="4" y="8" width="13" height="10" rx="3" stroke="#1A2B4A" strokeWidth="1.5" fill="#EDF7F6"/>
+    <rect x="23" y="8" width="13" height="10" rx="3" stroke="#1A2B4A" strokeWidth="1.5" fill="#EDF7F6"/>
+    <rect x="4" y="22" width="13" height="10" rx="3" stroke="#1A2B4A" strokeWidth="1.5" fill="#EDF7F6"/>
+    <rect x="23" y="22" width="13" height="10" rx="3" stroke="#1A2B4A" strokeWidth="1.5" fill="#EDF7F6"/>
     <line x1="17" y1="13" x2="23" y2="13" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeDasharray="2 3"/>
     <line x1="17" y1="27" x2="23" y2="27" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeDasharray="2 3"/>
   </svg>
