@@ -31,10 +31,13 @@ const Showcase = () => {
     <section className="showcase-section" id="dashboard">
       <div className="container">
         <div className="showcase-header reveal">
-          <span className="eyebrow">Interactive Telemetry</span>
+          <div className="section-eyebrow-pill">
+            <span className="eyebrow-dot" />
+            <span className="eyebrow-label">Interactive Telemetry</span>
+          </div>
           <h2 className="section-headline">
             Engineered for real African classrooms,<br />
-            not Silicon Valley theory
+            <span className="text-blue">not Silicon Valley theory</span>
           </h2>
           <p className="section-sub">
             A high-density, low-latency command center that handles Cameroon's Sequence 1–4,

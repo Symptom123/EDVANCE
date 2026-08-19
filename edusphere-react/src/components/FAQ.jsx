@@ -37,10 +37,13 @@ const FAQ = () => {
         <div className="faq-layout">
           {/* Left Column: Sticky Title */}
           <div className="faq-sticky reveal">
-            <span className="eyebrow">Frequently Answered</span>
+            <div className="section-eyebrow-pill">
+              <span className="eyebrow-dot" />
+              <span className="eyebrow-label">Frequently Answered</span>
+            </div>
             <h2 className="section-headline">
               Answers for discerning<br />
-              headmasters & trustees
+              <span className="text-blue">headmasters & trustees</span>
             </h2>
             <p className="section-sub">
               Everything you need to know about curriculum compliance, regional security standards,

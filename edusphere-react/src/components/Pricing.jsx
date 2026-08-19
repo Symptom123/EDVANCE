@@ -1,15 +1,18 @@
 import React from 'react';
-import { Check, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Check, ShieldCheck, ArrowRight, Sparkles } from 'lucide-react';
 
 const Pricing = () => {
   return (
     <section className="pricing-section" id="pricing">
       <div className="container">
         <div className="pricing-header reveal">
-          <span className="eyebrow">Transparent Investment</span>
+          <div className="section-eyebrow-pill">
+            <span className="eyebrow-dot" />
+            <span className="eyebrow-label">Transparent Investment</span>
+          </div>
           <h2 className="section-headline">
             Institutional plans with<br />
-            zero hidden surcharges
+            <span className="text-blue">zero hidden surcharges</span>
           </h2>
           <p className="section-sub">
             Every tier includes bilingual onboarding support, local currency payment options (XAF / USD),
@@ -19,7 +22,7 @@ const Pricing = () => {
 
         <div className="pricing-grid">
           {/* Tier 1: Starter */}
-          <div className="pricing-card spotlight-card reveal">
+          <div className="pricing-card reveal">
             <div className="pricing-tier">Starter Academy</div>
             <div className="pricing-price">
               <span className="price-main">Custom</span>
@@ -49,15 +52,19 @@ const Pricing = () => {
                 <span>Free legacy Excel / paper data migration</span>
               </div>
             </div>
-            <a href="/register" className="btn btn-outline-full">
-              Begin 30-day trial
+            <a href="/register" className="btn btn-secondary-full">
+              <span>Begin 30-day trial</span>
+              <ArrowRight size={15} className="btn-arrow-trailing" />
             </a>
           </div>
 
           {/* Tier 2: Professional (Featured) */}
-          <div className="pricing-card featured spotlight-card reveal reveal-delay-1">
-            <div className="pricing-popular">Most Selected by Principals</div>
-            <div className="pricing-tier" style={{ color: '#2d7d4a' }}>Professional Campus</div>
+          <div className="pricing-card is-featured reveal reveal-delay-1">
+            <div className="pricing-popular">
+              <Sparkles size={12} />
+              <span>Most Selected by Principals</span>
+            </div>
+            <div className="pricing-tier text-blue">Professional Campus</div>
             <div className="pricing-price">
               <span className="price-currency">$</span>
               <span className="price-main">490</span>
@@ -93,13 +100,13 @@ const Pricing = () => {
               </div>
             </div>
             <a href="/register" className="btn btn-primary-full">
-              Deploy for your school
-              <ArrowRight size={15} />
+              <span>Deploy for your school</span>
+              <ArrowRight size={16} className="btn-arrow-trailing" />
             </a>
           </div>
 
           {/* Tier 3: Multi-Campus Enterprise */}
-          <div className="pricing-card spotlight-card reveal reveal-delay-2">
+          <div className="pricing-card reveal reveal-delay-2">
             <div className="pricing-tier">District & Multi-Campus</div>
             <div className="pricing-price">
               <span className="price-main" style={{ fontSize: '38px', letterSpacing: '-0.02em' }}>Enterprise</span>
@@ -129,14 +136,15 @@ const Pricing = () => {
                 <span>On-premise or sovereign cloud hosting option</span>
               </div>
             </div>
-            <a href="#contact" className="btn btn-outline-full">
-              Request formal proposal
+            <a href="#contact" className="btn btn-secondary-full">
+              <span>Request formal proposal</span>
+              <ArrowRight size={15} className="btn-arrow-trailing" />
             </a>
           </div>
         </div>
 
         <div className="pricing-footnote reveal">
-          <ShieldCheck size={16} color="#2d7d4a" />
+          <ShieldCheck size={16} className="text-blue" />
           <span>All plans come with a 30-day evaluation period. Local payments accepted via Bank Wire, Mobile Money (MTN/Orange MoMo), and Cards.</span>
         </div>
       </div>

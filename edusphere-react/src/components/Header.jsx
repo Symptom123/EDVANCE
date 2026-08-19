@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Search, Phone, Mail, MapPin, Globe, Shield, ChevronRight } from 'lucide-react';
 
 const Header = () => {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeNav, setActiveNav] = useState('hero');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 12);
+    const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -20,7 +21,7 @@ const Header = () => {
           if (entry.isIntersecting) setActiveNav(entry.target.id);
         });
       },
-      { rootMargin: '-40% 0px -50% 0px' }
+      { rootMargin: '-30% 0px -60% 0px' }
     );
     sections.forEach(s => observer.observe(s));
     return () => observer.disconnect();
@@ -40,6 +41,7 @@ const Header = () => {
   const navLinks = [
     { id: 'solution', label: 'Product' },
     { id: 'dashboard', label: 'Dashboard' },
+    { id: 'how-it-works', label: 'Workflow' },
     { id: 'pricing', label: 'Pricing' },
     { id: 'testimonials', label: 'Customers' },
     { id: 'contact', label: 'Contact' },
@@ -47,82 +49,174 @@ const Header = () => {
 
   return (
     <>
-      <header className={`site-header ${scrolled ? 'scrolled' : ''}`} id="siteHeader">
-        <div className="header-inner">
-          {/* Logo */}
-          <a className="brand" href="/" aria-label="Edvance home">
-            <img
-              src="/images/logo-horizontal.png"
-              alt="Edvance"
-              style={{ height: '32px', width: 'auto', objectFit: 'contain' }}
-              onError={(e) => { e.target.style.display = 'none'; }}
-            />
-            <span className="brand-wordmark" style={{ display: 'none' }}>
-              Edv<span>ance</span>
-            </span>
-          </a>
+      <header className={`site-header-wrapper ${scrolled ? 'is-scrolled' : ''}`} id="siteHeader">
+        {/* Tier 1: Dark Navy Utility Bar */}
+        <div className="top-utility-bar">
+          <div className="container">
+            <div className="utility-bar-inner">
+              <div className="utility-left">
+                <a href="tel:+237670000000" className="utility-link">
+                  <Phone size={13} className="utility-icon" />
+                  <span>+237 670 000 000</span>
+                </a>
+                <span className="utility-sep">•</span>
+                <a href="mailto:chancellery@edvance.io" className="utility-link">
+                  <Mail size={13} className="utility-icon" />
+                  <span>chancellery@edvance.io</span>
+                </a>
+                <span className="utility-sep d-none-mobile">•</span>
+                <span className="utility-text d-none-mobile">
+                  <MapPin size={13} className="utility-icon" />
+                  <span>Bastos Diplomatic Quarter, Yaoundé</span>
+                </span>
+              </div>
 
-          {/* Desktop nav */}
-          <nav className="main-nav" role="navigation" aria-label="Main navigation">
-            {navLinks.map(link => (
-              <a
-                key={link.id}
-                href={`#${link.id}`}
-                className={`nav-item ${activeNav === link.id ? 'active' : ''}`}
-              >
-                {link.label}
-              </a>
-            ))}
-          </nav>
-
-          {/* Desktop CTA */}
-          <div className="header-cta">
-            <a href="/login" className="btn-text">Sign in</a>
-            <a href="/register" className="btn btn-primary btn--sm">Get started</a>
+              <div className="utility-right">
+                <span className="utility-badge">
+                  <Shield size={12} className="utility-badge-icon" />
+                  <span>MINESEC & GCE Board Compliant</span>
+                </span>
+                <span className="utility-sep">•</span>
+                <div className="utility-lang">
+                  <Globe size={13} className="utility-icon" />
+                  <span>Bilingual (EN / FR)</span>
+                </div>
+              </div>
+            </div>
           </div>
+        </div>
 
-          {/* Mobile toggle */}
-          <button
-            className="mobile-menu-btn"
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="Toggle navigation menu"
-            aria-expanded={menuOpen}
-          >
-            {menuOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
+        {/* Tier 2: Main White Navigation Bar */}
+        <div className="main-nav-bar">
+          <div className="container">
+            <div className="main-nav-inner">
+              {/* Brand Logo */}
+              <a className="brand-logo" href="/" aria-label="Edvance Home">
+                <div className="brand-icon-box">
+                  <span className="brand-letter">E</span>
+                </div>
+                <div className="brand-text-wrap">
+                  <span className="brand-title">Edv<span className="brand-title-accent">ance</span></span>
+                  <span className="brand-tag">School System</span>
+                </div>
+              </a>
+
+              {/* Desktop Search Field */}
+              <div className="nav-search-wrap">
+                <Search size={15} className="nav-search-icon" />
+                <input
+                  type="text"
+                  className="nav-search-input"
+                  placeholder="Search modules, GCE, BEPC..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  aria-label="Quick search"
+                />
+                <kbd className="nav-search-shortcut">⌘K</kbd>
+              </div>
+
+              {/* Desktop Nav Links */}
+              <nav className="desktop-nav" role="navigation" aria-label="Main navigation">
+                {navLinks.map(link => (
+                  <a
+                    key={link.id}
+                    href={`#${link.id}`}
+                    className={`desktop-nav-link ${activeNav === link.id ? 'is-active' : ''}`}
+                  >
+                    {link.label}
+                  </a>
+                ))}
+              </nav>
+
+              {/* Desktop Action Cluster */}
+              <div className="nav-actions-cluster">
+                <a href="/login" className="btn-nav-login" title="Staff Portal Sign In">
+                  <span>Sign in</span>
+                </a>
+                <a href="/register" className="btn-nav-primary">
+                  <span>Get started</span>
+                  <ChevronRight size={15} className="btn-nav-arrow" />
+                </a>
+              </div>
+
+              {/* Mobile Menu Toggle */}
+              <button
+                className="mobile-toggle-btn"
+                onClick={() => setMenuOpen(!menuOpen)}
+                aria-label="Toggle navigation menu"
+                aria-expanded={menuOpen}
+              >
+                {menuOpen ? <X size={22} /> : <Menu size={22} />}
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* Mobile Drawer */}
+      {/* Mobile Drawer Sheet */}
       <div 
-        className={`mobile-drawer ${menuOpen ? 'open' : ''}`} 
+        className={`mobile-menu-overlay ${menuOpen ? 'is-visible' : ''}`} 
         aria-hidden={!menuOpen}
         onClick={(e) => {
-          if (e.target.classList.contains('mobile-drawer')) setMenuOpen(false);
+          if (e.target.classList.contains('mobile-menu-overlay')) setMenuOpen(false);
         }}
       >
-        <div className="mobile-drawer-inner">
-          <nav className="mobile-drawer-nav">
+        <div className="mobile-menu-sheet">
+          <div className="mobile-sheet-header">
+            <div className="brand-logo">
+              <div className="brand-icon-box">
+                <span className="brand-letter">E</span>
+              </div>
+              <span className="brand-title">Edv<span className="brand-title-accent">ance</span></span>
+            </div>
+            <button className="mobile-close-btn" onClick={() => setMenuOpen(false)}>
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="mobile-search-box">
+            <Search size={16} />
+            <input 
+              type="text" 
+              placeholder="Search curriculum or portal..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <nav className="mobile-nav-list">
             {navLinks.map(link => (
               <a
                 key={link.id}
                 href={`#${link.id}`}
-                className={`mobile-nav-item ${activeNav === link.id ? 'active' : ''}`}
+                className={`mobile-nav-link ${activeNav === link.id ? 'is-active' : ''}`}
                 onClick={() => setMenuOpen(false)}
               >
                 <span>{link.label}</span>
-                <span className="mobile-nav-arrow">→</span>
+                <ChevronRight size={16} className="mobile-link-arrow" />
               </a>
             ))}
           </nav>
-          <div className="mobile-drawer-cta">
-            <a href="/login" className="btn btn-outline-full" onClick={() => setMenuOpen(false)}>Sign in to Portal</a>
-            <a href="/register" className="btn btn-primary-full" onClick={() => setMenuOpen(false)}>Start 30-day Free Trial</a>
+
+          <div className="mobile-sheet-actions">
+            <a href="/login" className="btn-mobile-secondary" onClick={() => setMenuOpen(false)}>
+              Sign in to Portal
+            </a>
+            <a href="/register" className="btn-mobile-primary" onClick={() => setMenuOpen(false)}>
+              <span>Start 30-Day Free Trial</span>
+              <ChevronRight size={16} />
+            </a>
           </div>
-          <div className="mobile-drawer-footer">
-            <span>MINESEC & GCE Board Compliant</span>
-            <span>•</span>
-            <span>Bilingual SMS Platform</span>
+
+          <div className="mobile-sheet-footer">
+            <div className="mobile-footer-pill">
+              <Shield size={13} />
+              <span>MINESEC & GCE Board Compliant</span>
+            </div>
+            <div className="mobile-contact-line">
+              <Phone size={13} />
+              <span>+237 670 000 000</span>
+            </div>
           </div>
         </div>
       </div>

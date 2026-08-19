@@ -6,10 +6,13 @@ const CtaSection = () => {
     <section className="cta-section" id="get-started">
       <div className="container">
         <div className="cta-inner reveal">
-          <span className="eyebrow eyebrow--gold">Institutional Transformation</span>
+          <div className="section-eyebrow-pill eyebrow-on-dark">
+            <span className="eyebrow-dot" />
+            <span className="eyebrow-label">Institutional Transformation</span>
+          </div>
           <h2 className="cta-headline">
             Ready to lead your school<br />
-            <em>without spreadsheet chaos?</em>
+            <span className="text-blue-light">without spreadsheet chaos?</span>
           </h2>
           <p className="cta-sub">
             Join 2,400+ African institutions already operating on Edvance.
@@ -18,12 +21,13 @@ const CtaSection = () => {
 
           <div className="cta-buttons">
             <a href="/register" className="btn btn-primary btn--lg">
-              Start 30-day free trial
-              <ArrowRight size={17} />
+              <span>Start 30-day free trial</span>
+              <ArrowRight size={17} className="btn-arrow-trailing" />
             </a>
-            <a href="#contact" className="btn btn-secondary btn--lg">
+            <a href="#contact" className="btn btn-secondary-dark btn--lg">
               <Calendar size={17} />
-              Schedule a leadership demo
+              <span>Schedule a leadership demo</span>
+              <ArrowRight size={15} className="btn-arrow-trailing opacity-70" />
             </a>
           </div>
 

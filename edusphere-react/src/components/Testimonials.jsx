@@ -39,10 +39,13 @@ const Testimonials = () => {
     <section className="testimonials-section" id="testimonials">
       <div className="container">
         <div className="testi-header reveal">
-          <span className="eyebrow">Institutional Endorsements</span>
+          <div className="section-eyebrow-pill">
+            <span className="eyebrow-dot" />
+            <span className="eyebrow-label">Institutional Endorsements</span>
+          </div>
           <h2 className="section-headline">
             Trusted by the principals<br />
-            shaping Africa's future
+            <span className="text-blue">shaping Africa's future</span>
           </h2>
           <p className="section-sub">
             Leading academic institutions rely on Edvance to manage examinations, 
@@ -54,15 +57,15 @@ const Testimonials = () => {
           {testimonials.map((t, idx) => (
             <div 
               key={t.id} 
-              className={`testi-card spotlight-card ${t.featured ? 'featured' : ''} reveal reveal-delay-${idx + 1}`}
+              className={`testi-card ${t.featured ? 'is-featured' : ''} reveal reveal-delay-${idx + 1}`}
             >
               <div className="testi-stars">
                 {[...Array(5)].map((_, s) => (
                   <Star 
                     key={s} 
-                    size={15} 
-                    fill="#c9a96e" 
-                    color="#c9a96e" 
+                    size={16} 
+                    fill="#E8A23A" 
+                    color="#E8A23A" 
                   />
                 ))}
               </div>
