@@ -3,10 +3,12 @@
    Palette: Vivid Blue (#2D8C8C), Dark Navy (#1A2B4A),
             Pale Blue (#EDF7F6), Warm Orange (#E8A23A),
             Pure White (#FFFFFF)
-   Typography: Bold Rounded Sans ('Plus Jakarta Sans', 'Outfit')
+   Typography: Fredoka (headlines) + Open Sans (body/nav)
+               — extracted from Severna Private School Framer site
    ===================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Open+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 
 :root {
   /* ── Core Brand Palette ── */
@@ -52,9 +54,9 @@
   --gray-700:           #334155;
   --gray-800:           #1E293B;
 
-  /* ── Typography Tokens ── */
-  --font-headline:      'Plus Jakarta Sans', 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-body:          'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* ── Typography Tokens — Severna Framer style ── */
+  --font-headline:      'Fredoka', 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body:          'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono:          'JetBrains Mono', monospace;
 
   --text-hero:          clamp(38px, 4.5vw, 56px);
@@ -142,12 +144,13 @@ body {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-headline);
-  font-weight: 700;
+  font-family: 'Fredoka', var(--font-headline);
+  font-weight: 600;
   color: var(--navy);
-  line-height: var(--lh-tight);
-  letter-spacing: var(--ls-tight);
+  line-height: 1.1;
+  letter-spacing: -0.01em; /* Fredoka looks great slightly tight */
 }
+
 
 p {
   line-height: var(--lh-relaxed);
@@ -3587,4 +3590,126 @@ img { max-width: 100%; height: auto; display: block; }
   .sv-glass-row { gap: 8px; }
   .sv-glass-chip { max-width: 100%; font-size: 13px; }
   .sv-benefit-divider { display: none; }
+}
+
+
+/* ═══════════════════════════════════════════════════
+   SEVERNA FONT OVERRIDES — Global Fredoka + Open Sans
+   Fredoka: headlines, section titles, eyebrows, CTAs
+   Open Sans: nav, body copy, badges, labels, chips
+   ═══════════════════════════════════════════════════ */
+
+/* Headlines — force Fredoka everywhere */
+.sv-hero-headline,
+.section-headline,
+.hero-headline,
+.section-title,
+.problem-headline,
+.feature-card h3,
+.bento-title,
+.footer-logo-wordmark,
+.testimonial-card h4,
+.pricing-card h3,
+.cta-section h2,
+.stats-section h2,
+.sv-proof-num {
+  font-family: 'Fredoka', sans-serif !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em;
+}
+
+/* Gradient headline lines — Fredoka */
+.sv-hl-light,
+.sv-hl-gradient {
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 600;
+}
+
+/* Fredoka for all section h2/h3 */
+section h2, section h3 {
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 600;
+}
+
+/* Open Sans for body, nav, utility UI */
+body,
+p,
+.nav-link,
+.desktop-nav-link,
+.utility-link,
+.utility-text,
+.btn,
+.sv-btn-primary,
+.sv-btn-ghost,
+.sv-glass-chip,
+.sv-proof-lbl,
+.sv-live-pill,
+.sv-badge-title,
+.sv-badge-sub,
+.sv-benefit-item,
+.hero-sub,
+.sv-hero-sub,
+.sv-hero-eyebrow,
+.section-eyebrow-pill,
+.feature-card p,
+.benefit-check-item,
+.mobile-nav-link,
+.footer-link,
+.footer-tagline,
+input,
+textarea,
+select {
+  font-family: 'Open Sans', sans-serif;
+}
+
+/* Navigation — Open Sans semibold */
+.desktop-nav-link,
+.mobile-nav-link,
+.nav-actions-cluster,
+.top-utility-bar {
+  font-family: 'Open Sans', sans-serif;
+  font-weight: 600;
+}
+
+/* Buttons — Open Sans bold */
+.btn,
+.sv-btn-primary,
+.sv-btn-ghost,
+.btn-primary,
+.btn-secondary {
+  font-family: 'Open Sans', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+/* Eyebrow labels — Open Sans uppercase */
+.sv-hero-eyebrow,
+.eyebrow-label,
+.section-eyebrow-pill .eyebrow-label,
+.sv-live-pill {
+  font-family: 'Open Sans', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+
+/* Fredoka: boost hero headline size on dark hero */
+.sv-hero-headline {
+  font-size: clamp(56px, 9vw, 104px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 0.98;
+}
+
+/* Section H2 Fredoka sizing */
+section h2 {
+  font-size: clamp(32px, 4.5vw, 52px);
+  font-weight: 600;
+}
+
+/* Section H3 Fredoka sizing */
+section h3 {
+  font-size: clamp(20px, 2.5vw, 28px);
+  font-weight: 600;
 }
