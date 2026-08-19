@@ -3160,3 +3160,431 @@ img { max-width: 100%; height: auto; display: block; }
   align-items: center;
   pointer-events: none;
 }
+
+
+
+
+
+/* ═══════════════════════════════════════════
+   SEVERNA-STYLE HERO — Crystal BG + Editorial
+   ═══════════════════════════════════════════ */
+
+/* Override old hero-section gradient now handled by .sv-hero */
+.hero-section { background: none; padding: 0; }
+
+.sv-hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* ── Full-bleed background image ── */
+.sv-hero-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.sv-hero-bg-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+  animation: heroBgPan 25s ease-in-out infinite alternate;
+  transform-origin: center;
+}
+
+@keyframes heroBgPan {
+  0%   { transform: scale(1.05) translate(0, 0); }
+  50%  { transform: scale(1.08) translate(-1.5%, 1%); }
+  100% { transform: scale(1.05) translate(1%, -1%); }
+}
+
+/* Cinematic gradient overlay — white/mint at bottom fades to dark navy at top */
+.sv-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(10, 18, 35, 0.82) 0%,
+      rgba(15, 26, 50, 0.70) 30%,
+      rgba(15, 26, 50, 0.55) 60%,
+      rgba(10, 20, 40, 0.85) 100%
+    );
+}
+
+/* Radial spotlight glow — teal emanating from center */
+.sv-hero-spotlight {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 70% 55% at 50% 65%,
+    rgba(45, 140, 140, 0.22) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+}
+
+/* ── Content positioning ── */
+.sv-hero-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-top: 120px;
+  padding-bottom: 60px;
+  gap: 0;
+}
+
+/* ── Live pill ── */
+.sv-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 7px 18px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 24px;
+}
+
+.sv-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2D8C8C;
+  box-shadow: 0 0 0 2px rgba(45, 140, 140, 0.35);
+  animation: livePulse 2s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(45, 140, 140, 0.35); }
+  50% { box-shadow: 0 0 0 5px rgba(45, 140, 140, 0); }
+}
+
+/* ── Eyebrow text ── */
+.sv-hero-eyebrow {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #7DD3D0;
+  margin-bottom: 20px;
+}
+
+/* ── Editorial Headline ── */
+.sv-hero-headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: clamp(52px, 8vw, 96px);
+  font-weight: 900;
+  line-height: 1.0;
+  letter-spacing: -0.03em;
+  margin-bottom: 28px;
+}
+
+.sv-headline-line {
+  display: block;
+}
+
+.sv-hl-light {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.sv-hl-gradient {
+  background: linear-gradient(90deg, #2D8C8C 0%, #7DD3D0 40%, #E8A23A 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 2px 24px rgba(45,140,140,0.45));
+}
+
+/* ── Sub copy ── */
+.sv-hero-sub {
+  font-size: clamp(16px, 2.2vw, 20px);
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.68);
+  max-width: 640px;
+  margin-bottom: 36px;
+}
+
+/* ── CTA buttons ── */
+.sv-hero-ctas {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 40px;
+}
+
+.sv-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #2D8C8C 0%, #1A6A6A 100%);
+  color: #fff;
+  padding: 16px 32px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: 0 8px 32px rgba(45, 140, 140, 0.45), 0 0 0 1px rgba(45,140,140,0.3);
+  transition: all 0.25s cubic-bezier(0.16,1,0.3,1);
+}
+
+.sv-btn-primary:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 16px 48px rgba(45, 140, 140, 0.55), 0 0 0 1px rgba(45,140,140,0.4);
+  color: #fff;
+}
+
+.sv-btn-primary svg {
+  transition: transform 0.2s ease;
+}
+.sv-btn-primary:hover svg {
+  transform: translateX(4px);
+}
+
+.sv-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: rgba(255, 255, 255, 0.88);
+  padding: 15px 28px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  transition: all 0.25s cubic-bezier(0.16,1,0.3,1);
+}
+
+.sv-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.36);
+  transform: translateY(-2px);
+  color: #fff;
+}
+
+/* ── Glass checklist chips ── */
+.sv-glass-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 44px;
+  max-width: 860px;
+}
+
+.sv-glass-chip {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 12px 18px;
+  border-radius: 12px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.78);
+  text-align: left;
+  line-height: 1.5;
+  max-width: 280px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.sv-glass-chip:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(45, 140, 140, 0.4);
+}
+
+.sv-chip-check {
+  color: #2D8C8C;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* ── Proof numbers strip ── */
+.sv-proof-strip {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 20px;
+  padding: 20px 40px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.sv-proof-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 0 28px;
+}
+
+.sv-proof-num {
+  font-size: 28px;
+  font-weight: 900;
+  color: #fff;
+  line-height: 1;
+  background: linear-gradient(135deg, #fff 0%, #7DD3D0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.sv-proof-lbl {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.sv-proof-sep {
+  width: 1px;
+  height: 36px;
+  background: rgba(255,255,255,0.12);
+  flex-shrink: 0;
+}
+
+/* ── Floating proof badges ── */
+.sv-badge {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 10px 16px;
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+}
+
+.sv-badge--tl { top: 22%; left: 4%; }
+.sv-badge--tr { top: 18%; right: 4%; }
+.sv-badge--bl { bottom: 22%; left: 3%; }
+.sv-badge--br { bottom: 20%; right: 3%; }
+
+@media (max-width: 900px) {
+  .sv-badge--tl, .sv-badge--tr { display: none; }
+  .sv-badge--bl { bottom: 18%; left: 50%; transform: translateX(-50%); }
+  .sv-badge--br { display: none; }
+}
+
+.sv-badge-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sv-badge-icon--gold   { background: rgba(232,162,58,0.2); }
+.sv-badge-icon--teal   { background: rgba(45,140,140,0.2); }
+.sv-badge-icon--navy   { background: rgba(26,42,74,0.6); }
+.sv-badge-icon--green  { background: rgba(22,163,74,0.18); }
+
+.sv-badge-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sv-badge-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.sv-badge-sub {
+  font-size: 11px;
+  color: rgba(255,255,255,0.55);
+  white-space: nowrap;
+}
+
+/* ── Bottom benefit icon bar ── */
+.sv-benefit-bar {
+  position: relative;
+  z-index: 2;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  background: rgba(10, 18, 35, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 18px 0;
+  margin-top: auto;
+}
+
+.sv-benefit-bar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sv-benefit-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.7);
+  padding: 6px 16px;
+  white-space: nowrap;
+}
+
+.sv-benefit-item:hover {
+  color: #fff;
+}
+
+.sv-benefit-icon {
+  color: #2D8C8C;
+}
+
+.sv-benefit-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255,255,255,0.12);
+}
+
+@media (max-width: 768px) {
+  .sv-hero-content { padding-top: 90px; padding-bottom: 50px; }
+  .sv-proof-strip { padding: 16px 20px; gap: 12px; }
+  .sv-proof-item { padding: 0 16px; }
+  .sv-glass-row { gap: 8px; }
+  .sv-glass-chip { max-width: 100%; font-size: 13px; }
+  .sv-benefit-divider { display: none; }
+}

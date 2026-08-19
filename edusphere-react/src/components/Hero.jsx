@@ -1,220 +1,183 @@
 import React from 'react';
 import { ArrowRight, Calendar, Check, Star, ShieldCheck, Sparkles, Award, Users, Activity, FileCheck, Layers } from 'lucide-react';
 
-/* ── Luxury 3D Visual with Floating Badges & Volumetric Reflections ── */
-const HeroLuxuryVisual = () => (
-  <div className="hero-luxury-visual-container">
-    {/* Ambient Volumetric Glow & Decorative Halo */}
-    <div className="hero-luxury-halo" aria-hidden="true" />
-    <div className="hero-dot-grid" aria-hidden="true" />
-
-    {/* Center 3D Floating Workstation Image with Luxury Glass Frame */}
-    <div className="hero-luxury-frame">
-      <div className="hero-luxury-frame-inner">
-        <img
-          src="/images/luxury/laptop-floating-docs.jpg"
-          alt="Edvance SMS Luxury 3D Telemetry Platform"
-          className="hero-luxury-main-img"
-        />
-        <div className="hero-glass-overlay">
-          <div className="glass-chip-top">
-            <span className="live-pulse-dot" />
-            <span>MINESEC Official Standard • Live Telemetry</span>
-          </div>
-        </div>
+/* ── Floating Proof Badges ── */
+const FloatingBadges = () => (
+  <>
+    {/* Top-left badge */}
+    <div className="sv-badge sv-badge--tl float-slow">
+      <div className="sv-badge-icon sv-badge-icon--gold">
+        <Star size={14} fill="#E8A23A" color="#E8A23A" />
+      </div>
+      <div className="sv-badge-body">
+        <span className="sv-badge-title">★ 4.9 / 5</span>
+        <span className="sv-badge-sub">2,400+ African Schools</span>
       </div>
     </div>
 
-    {/* Floating Badge 1: Top Left — Rating & Social Proof */}
-    <div className="floating-stat-badge badge-pos-top-left float-slow">
-      <div className="stat-badge-icon badge-icon-orange">
-        <Star size={16} fill="#E8A23A" color="#E8A23A" />
+    {/* Top-right badge */}
+    <div className="sv-badge sv-badge--tr float-reverse">
+      <div className="sv-badge-icon sv-badge-icon--teal">
+        <FileCheck size={14} color="#2D8C8C" />
       </div>
-      <div className="stat-badge-content">
-        <div className="stat-badge-title">★ 4.9/5 Rating</div>
-        <div className="stat-badge-sub">2,400+ African Schools</div>
-      </div>
-    </div>
-
-    {/* Floating Badge 2: Top Right — Official 3D Report Card Generator */}
-    <div className="floating-stat-badge badge-pos-top-right float-reverse">
-      <div className="stat-badge-icon badge-icon-teal">
-        <FileCheck size={16} color="#2D8C8C" />
-      </div>
-      <div className="stat-badge-content">
-        <div className="stat-badge-title">Bilingual Report Cards</div>
-        <div className="stat-badge-sub">MINESEC & GCE Compliant ✓</div>
+      <div className="sv-badge-body">
+        <span className="sv-badge-title">GCE & BEPC Compliant</span>
+        <span className="sv-badge-sub">MINESEC Official ✓</span>
       </div>
     </div>
 
-    {/* Floating Badge 3: Bottom Left — Students Managed */}
-    <div className="floating-stat-badge badge-pos-bottom-left float-reverse">
-      <div className="stat-badge-icon badge-icon-navy">
-        <Users size={16} color="#FFFFFF" />
+    {/* Bottom-left badge */}
+    <div className="sv-badge sv-badge--bl float-slow" style={{ animationDelay: '0.8s' }}>
+      <div className="sv-badge-icon sv-badge-icon--navy">
+        <Users size={14} color="#fff" />
       </div>
-      <div className="stat-badge-content">
-        <div className="stat-badge-title">850K+ Students</div>
-        <div className="stat-badge-sub">Managed across 10 regions</div>
+      <div className="sv-badge-body">
+        <span className="sv-badge-title">850K+ Students</span>
+        <span className="sv-badge-sub">Across 10 regions</span>
       </div>
     </div>
 
-    {/* Floating Badge 4: Bottom Right — Cloud Uptime */}
-    <div className="floating-stat-badge badge-pos-bottom-right float-slow">
-      <div className="stat-badge-icon badge-icon-green">
-        <Activity size={16} color="#16A34A" />
+    {/* Bottom-right badge */}
+    <div className="sv-badge sv-badge--br float-reverse" style={{ animationDelay: '0.4s' }}>
+      <div className="sv-badge-icon sv-badge-icon--green">
+        <Activity size={14} color="#16A34A" />
       </div>
-      <div className="stat-badge-content">
-        <div className="stat-badge-title">99.9% Cloud Uptime</div>
-        <div className="stat-badge-sub">Offline Sync Mode Active</div>
+      <div className="sv-badge-body">
+        <span className="sv-badge-title">99.9% Uptime</span>
+        <span className="sv-badge-sub">Offline Sync Active</span>
       </div>
     </div>
-  </div>
+  </>
 );
 
 const Hero = () => (
-  <section className="hero-section" id="hero">
-    <div className="container">
-      <div className="hero-inner">
-        <div className="hero-grid">
+  <section className="sv-hero" id="hero">
 
-          {/* ── LEFT: Text Content ── */}
-          <div className="hero-text">
-            {/* Pill Eyebrow */}
-            <div className="hero-eyebrow-pill reveal">
-              <span className="eyebrow-star">✦</span>
-              <span className="eyebrow-text">The #1 African School Management Platform</span>
-            </div>
+    {/* ── Full-bleed crystal 3D background ── */}
+    <div className="sv-hero-bg" aria-hidden="true">
+      <img
+        src="/images/luxury/hero-bg-crystal.jpg"
+        alt=""
+        className="sv-hero-bg-img"
+      />
+      {/* Cinematic multi-layer overlay for legibility */}
+      <div className="sv-hero-overlay" />
+      {/* Radial spotlight glow emanating from center-bottom */}
+      <div className="sv-hero-spotlight" />
+    </div>
 
-            {/* Rounded Bold Headline mixing Vivid Blue & Dark Navy */}
-            <h1 className="hero-headline reveal reveal-delay-1">
-              <span className="text-navy">Enterprise school management for </span>
-              <span className="text-blue">Africa's finest</span>
-              <span className="text-navy"> educators</span>
-            </h1>
+    {/* ── Floating proof badges positioned over BG ── */}
+    <FloatingBadges />
 
-            {/* Subhead Body */}
-            <p className="hero-sub reveal reveal-delay-2">
-              Replace manual spreadsheets, paper mark sheets, and fragmented portals
-              with one unified system built for the GCE, BEPC, and Baccalauréat.
-            </p>
+    {/* ── Content Layer ── */}
+    <div className="container sv-hero-content">
 
-            {/* Small checkmark-prefixed benefit list format for quick value props */}
-            <div className="hero-benefit-checklist reveal reveal-delay-2">
-              <div className="benefit-check-item">
-                <div className="check-icon-circle">
-                  <Check size={12} strokeWidth={3} />
-                </div>
-                <span><strong>Zero spreadsheet errors:</strong> Automated coefficient weighting for Sequences 1–6</span>
-              </div>
-              <div className="benefit-check-item">
-                <div className="check-icon-circle">
-                  <Check size={12} strokeWidth={3} />
-                </div>
-                <span><strong>Instant bilingual report cards:</strong> GCE & BEPC MINESEC compliant in 1 click</span>
-              </div>
-              <div className="benefit-check-item">
-                <div className="check-icon-circle">
-                  <Check size={12} strokeWidth={3} />
-                </div>
-                <span><strong>Real-time parent visibility:</strong> Live SMS & WhatsApp alerts for grades & attendance</span>
-              </div>
-            </div>
+      {/* Live pill */}
+      <div className="sv-live-pill reveal">
+        <span className="sv-live-dot" />
+        <span>MINESEC Certified · Live Telemetry</span>
+      </div>
 
-            {/* Dual CTAs: Vivid Blue Rounded Primary + Dark Navy Secondary */}
-            <div className="hero-cta-group reveal reveal-delay-3">
-              <a href="/register" className="btn btn-primary btn--hero">
-                <span>Start free trial</span>
-                <ArrowRight size={17} className="btn-arrow-trailing" />
-              </a>
-              <a href="#dashboard" className="btn btn-secondary btn--hero">
-                <Calendar size={17} />
-                <span>Schedule a demo</span>
-                <ArrowRight size={15} className="btn-arrow-trailing opacity-70" />
-              </a>
-            </div>
+      {/* Eyebrow */}
+      <p className="sv-hero-eyebrow reveal reveal-delay-1">
+        The #1 African School Management Platform
+      </p>
 
-            {/* Social proof numbers strip */}
-            <div className="hero-proof-strip reveal reveal-delay-3">
-              <div className="hero-proof-item">
-                <span className="hero-proof-value">850K+</span>
-                <span className="hero-proof-label">Students managed</span>
-              </div>
-              <div className="hero-proof-sep" />
-              <div className="hero-proof-item">
-                <span className="hero-proof-value">40%</span>
-                <span className="hero-proof-label">Faster grade processing</span>
-              </div>
-              <div className="hero-proof-sep" />
-              <div className="hero-proof-item">
-                <span className="hero-proof-value">99.9%</span>
-                <span className="hero-proof-label">Platform uptime</span>
-              </div>
-            </div>
-          </div>
+      {/* Headline — editorial split style like Severna */}
+      <h1 className="sv-hero-headline reveal reveal-delay-1">
+        <span className="sv-headline-line sv-hl-light">Enterprise school</span>
+        <span className="sv-headline-line sv-hl-gradient">management for</span>
+        <span className="sv-headline-line sv-hl-light">Africa's finest</span>
+      </h1>
 
-          {/* ── RIGHT: Luxury 3D Visual Framing & Floating Badges ── */}
-          <div className="hero-visual reveal--right reveal reveal-delay-2">
-            <HeroLuxuryVisual />
-          </div>
+      {/* Sub copy */}
+      <p className="sv-hero-sub reveal reveal-delay-2">
+        Replace manual spreadsheets, paper mark sheets and fragmented portals with one
+        unified platform built for the GCE, BEPC, and Baccalauréat.
+      </p>
 
+      {/* CTA row */}
+      <div className="sv-hero-ctas reveal reveal-delay-3">
+        <a href="/register" className="sv-btn-primary">
+          Start free trial
+          <ArrowRight size={17} />
+        </a>
+        <a href="#dashboard" className="sv-btn-ghost">
+          <Calendar size={16} />
+          Schedule a demo
+        </a>
+      </div>
+
+      {/* Glass checklist cards row */}
+      <div className="sv-glass-row reveal reveal-delay-3">
+        <div className="sv-glass-chip">
+          <Check size={13} strokeWidth={3} className="sv-chip-check" />
+          <span><strong>Zero errors</strong> — automated coefficient weighting Seq 1–6</span>
+        </div>
+        <div className="sv-glass-chip">
+          <Check size={13} strokeWidth={3} className="sv-chip-check" />
+          <span><strong>1-click bilingual</strong> report cards — GCE & BEPC compliant</span>
+        </div>
+        <div className="sv-glass-chip">
+          <Check size={13} strokeWidth={3} className="sv-chip-check" />
+          <span><strong>Live SMS alerts</strong> — parents notified instantly on grades</span>
         </div>
       </div>
 
-      {/* ── 5-ICON BENEFIT STRIP ── */}
-      <div className="benefit-strip-wrapper reveal reveal-delay-3">
-        <div className="benefit-strip-grid">
-          <div className="benefit-strip-card">
-            <div className="benefit-strip-icon icon-blue">
-              <ShieldCheck size={20} />
-            </div>
-            <div className="benefit-strip-info">
-              <h4>MINESEC Compliant</h4>
-              <p>Official Cameroon & GCE standards built in</p>
-            </div>
-          </div>
-
-          <div className="benefit-strip-card">
-            <div className="benefit-strip-icon icon-orange">
-              <Sparkles size={20} />
-            </div>
-            <div className="benefit-strip-info">
-              <h4>30-Second Grading</h4>
-              <p>Instant weighted coefficient calculations</p>
-            </div>
-          </div>
-
-          <div className="benefit-strip-card">
-            <div className="benefit-strip-icon icon-blue">
-              <FileCheck size={20} />
-            </div>
-            <div className="benefit-strip-info">
-              <h4>Bilingual Reports</h4>
-              <p>English & French PDF generation with QR seal</p>
-            </div>
-          </div>
-
-          <div className="benefit-strip-card">
-            <div className="benefit-strip-icon icon-orange">
-              <Users size={20} />
-            </div>
-            <div className="benefit-strip-info">
-              <h4>Parent SMS Alerts</h4>
-              <p>Direct mobile grade & attendance notices</p>
-            </div>
-          </div>
-
-          <div className="benefit-strip-card">
-            <div className="benefit-strip-icon icon-navy">
-              <Layers size={20} />
-            </div>
-            <div className="benefit-strip-info">
-              <h4>Multi-Campus Scale</h4>
-              <p>Unified oversight for school networks</p>
-            </div>
-          </div>
+      {/* Proof numbers strip */}
+      <div className="sv-proof-strip reveal reveal-delay-4">
+        <div className="sv-proof-item">
+          <span className="sv-proof-num">850K+</span>
+          <span className="sv-proof-lbl">Students managed</span>
+        </div>
+        <div className="sv-proof-sep" />
+        <div className="sv-proof-item">
+          <span className="sv-proof-num">40%</span>
+          <span className="sv-proof-lbl">Faster grade processing</span>
+        </div>
+        <div className="sv-proof-sep" />
+        <div className="sv-proof-item">
+          <span className="sv-proof-num">99.9%</span>
+          <span className="sv-proof-lbl">Platform uptime</span>
+        </div>
+        <div className="sv-proof-sep" />
+        <div className="sv-proof-item">
+          <span className="sv-proof-num">10+</span>
+          <span className="sv-proof-lbl">African regions covered</span>
         </div>
       </div>
     </div>
+
+    {/* ── Bottom benefit icon bar ── */}
+    <div className="sv-benefit-bar">
+      <div className="container sv-benefit-bar-inner">
+        <div className="sv-benefit-item">
+          <ShieldCheck size={18} className="sv-benefit-icon" />
+          <span>MINESEC Compliant</span>
+        </div>
+        <div className="sv-benefit-divider" />
+        <div className="sv-benefit-item">
+          <Sparkles size={18} className="sv-benefit-icon" />
+          <span>30-Second Grading</span>
+        </div>
+        <div className="sv-benefit-divider" />
+        <div className="sv-benefit-item">
+          <FileCheck size={18} className="sv-benefit-icon" />
+          <span>Bilingual PDF Reports</span>
+        </div>
+        <div className="sv-benefit-divider" />
+        <div className="sv-benefit-item">
+          <Users size={18} className="sv-benefit-icon" />
+          <span>Parent SMS Alerts</span>
+        </div>
+        <div className="sv-benefit-divider" />
+        <div className="sv-benefit-item">
+          <Layers size={18} className="sv-benefit-icon" />
+          <span>Multi-Campus Scale</span>
+        </div>
+      </div>
+    </div>
+
   </section>
 );
 
