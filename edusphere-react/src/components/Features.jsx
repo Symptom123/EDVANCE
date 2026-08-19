@@ -182,23 +182,28 @@ const Features = () => {
         {/* Dense Information-Rich Card Grid */}
         <div className="dense-card-grid">
           {filteredSolutions.map((s, i) => (
-            <div key={s.id} className={`dense-info-card reveal reveal-delay-${(i % 3) + 1}`}>
-              {/* Card Header Preview Banner */}
-              <div className="card-mini-visual-banner">
-                <div className="banner-badge-left">
+            <div key={s.id} className={`dense-info-card luxury-bento-card reveal reveal-delay-${(i % 3) + 1}`}>
+              {/* 3D Image Banner with Luxury Glass Overlay */}
+              <div className="card-3d-visual-wrap">
+                <img
+                  src={
+                    s.id === 'grading' ? '/images/luxury/holographic-ui.jpg' :
+                    s.id === 'reports' ? '/images/luxury/3d-folder.jpg' :
+                    s.id === 'parent' ? '/images/luxury/laptop-floating-docs.jpg' :
+                    s.id === 'finance' ? '/images/luxury/3d-folder.jpg' :
+                    s.id === 'attendance' ? '/images/luxury/official-pen-docs.jpg' :
+                    '/images/luxury/holographic-ui.jpg'
+                  }
+                  alt={s.title}
+                  className="card-3d-img"
+                  loading="lazy"
+                />
+                <div className="card-3d-overlay">
                   <span className="card-corner-badge">{s.cornerBadge}</span>
                   <span className="card-metric-tag">
                     <Zap size={11} className="text-teal" />
                     <span>{s.highlightMetric}</span>
                   </span>
-                </div>
-                <div className="card-rating">
-                  <div className="card-stars">
-                    {[...Array(5)].map((_, idx) => (
-                      <Star key={idx} size={12} fill="#E8A23A" color="#E8A23A" />
-                    ))}
-                  </div>
-                  <span className="rating-num">{s.rating}</span>
                 </div>
               </div>
 

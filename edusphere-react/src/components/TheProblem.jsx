@@ -1,7 +1,7 @@
 import React from 'react';
-import { CheckCircle2, AlertCircle, ArrowRight, ShieldCheck, Award } from 'lucide-react';
+import { CheckCircle2, AlertCircle, ArrowRight, ShieldCheck, Award, XCircle, FileWarning, TrendingDown } from 'lucide-react';
 
-/* ── SVG Icons — redesigned with clean palette ── */
+/* ── SVG Icons — luxury palette ── */
 const SpreadsheetIcon = () => (
   <svg width="36" height="36" viewBox="0 0 40 40" fill="none" aria-hidden="true">
     <rect x="4" y="4" width="32" height="32" rx="8" stroke="#2D8C8C" strokeWidth="1.75" fill="#EDF7F6"/>
@@ -59,36 +59,54 @@ const TheProblem = () => (
   <section className="problem-section" id="problem">
     <div className="container">
       <div className="about-block-layout">
-        {/* Left Column: Credibility, Checklist & Experience Badge */}
+        {/* Left Column: Credibility, Checklist, Visual Image & Experience Badge */}
         <div className="about-credibility-col reveal">
           <div className="section-eyebrow-pill">
             <span className="eyebrow-dot" />
-            <span className="eyebrow-label">The Challenge</span>
+            <span className="eyebrow-label">The Administrative Crisis</span>
           </div>
 
           <h2 className="section-headline">
             Why 80% of African schools
             <br />
-            <span className="text-blue">still struggle with administration</span>
+            <span className="text-teal">still struggle with legacy administration</span>
           </h2>
 
           <p className="section-sub">
-            From Yaoundé to Lagos, school administrators face the same systemic problems —
-            fragmented tools, manual processes, and zero visibility for parents.
+            From Yaoundé to Lagos, school administrators face the same systemic bottlenecks —
+            drowning in physical mark sheets, error-prone calculations, and zero parent transparency.
           </p>
+
+          {/* Visual Archive Crisis Card */}
+          <div className="problem-visual-card">
+            <div className="problem-img-wrap">
+              <img
+                src="/images/luxury/paper-archives.jpg"
+                alt="Manual paper archives chaos before Edvance"
+                className="problem-archive-img"
+              />
+              <div className="problem-img-badge">
+                <FileWarning size={13} color="#DC2626" />
+                <span>Legacy Manual Archives</span>
+              </div>
+            </div>
+            <div className="problem-img-caption">
+              <span>Paper-based record storage costs institutions up to <strong>15% of annual operational time</strong> in retrieval and recalculation delays.</span>
+            </div>
+          </div>
 
           {/* Credibility Checklist */}
           <div className="about-checklist">
             <div className="about-check-item">
-              <CheckCircle2 size={18} className="about-check-icon text-blue" />
+              <CheckCircle2 size={18} className="about-check-icon text-teal" />
               <span>Full alignment with MINESEC official coefficient matrices</span>
             </div>
             <div className="about-check-item">
-              <CheckCircle2 size={18} className="about-check-icon text-blue" />
+              <CheckCircle2 size={18} className="about-check-icon text-teal" />
               <span>Dedicated Anglophone GCE Board & Francophone BEPC modules</span>
             </div>
             <div className="about-check-item">
-              <CheckCircle2 size={18} className="about-check-icon text-blue" />
+              <CheckCircle2 size={18} className="about-check-icon text-teal" />
               <span>Offline-first mark entry safeguards against power & network cuts</span>
             </div>
           </div>
@@ -128,3 +146,4 @@ const TheProblem = () => (
 );
 
 export default TheProblem;
+

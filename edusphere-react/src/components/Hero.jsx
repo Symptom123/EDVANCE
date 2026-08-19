@@ -1,83 +1,27 @@
 import React from 'react';
 import { ArrowRight, Calendar, Check, Star, ShieldCheck, Sparkles, Award, Users, Activity, FileCheck, Layers } from 'lucide-react';
 
-/* ── Circular Visual with Abstract Elements & Floating Badges ── */
-const HeroCircularVisual = () => (
-  <div className="hero-visual-container">
-    {/* Decorative Dot-Grid Background Element */}
+/* ── Luxury 3D Visual with Floating Badges & Volumetric Reflections ── */
+const HeroLuxuryVisual = () => (
+  <div className="hero-luxury-visual-container">
+    {/* Ambient Volumetric Glow & Decorative Halo */}
+    <div className="hero-luxury-halo" aria-hidden="true" />
     <div className="hero-dot-grid" aria-hidden="true" />
-    
-    {/* Decorative Circular Line Pattern & Glow Ring */}
-    <div className="hero-glow-ring" aria-hidden="true" />
-    <div className="hero-abstract-curves" aria-hidden="true">
-      <svg width="460" height="460" viewBox="0 0 460 460" fill="none">
-        <circle cx="230" cy="230" r="210" stroke="#2D8C8C" strokeWidth="1.5" strokeDasharray="6 6" opacity="0.25" />
-        <circle cx="230" cy="230" r="175" stroke="#1A2B4A" strokeWidth="1" opacity="0.12" />
-        <circle cx="230" cy="230" r="140" stroke="#E8A23A" strokeWidth="1.5" strokeDasharray="4 8" opacity="0.35" />
-      </svg>
-    </div>
 
-    {/* Center Circular Photo / Dashboard Framing */}
-    <div className="hero-circle-frame">
-      <div className="hero-circle-inner">
-        {/* Crisp vector illustration representing modern African school leadership */}
-        <svg viewBox="0 0 400 400" fill="none" className="hero-center-graphic">
-          <defs>
-            <linearGradient id="circleGrad" x1="0" y1="0" x2="400" y2="400" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#2D8C8C" />
-              <stop offset="100%" stopColor="#1A2B4A" />
-            </linearGradient>
-            <linearGradient id="cardGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#FFFFFF" />
-              <stop offset="100%" stopColor="#EDF7F6" />
-            </linearGradient>
-          </defs>
-
-          {/* Background circle */}
-          <circle cx="200" cy="200" r="190" fill="url(#circleGrad)" />
-
-          {/* Abstract classroom / digital tablet scene */}
-          <rect x="70" y="80" width="260" height="190" rx="16" fill="url(#cardGrad)" filter="drop-shadow(0 12px 24px rgba(0,0,0,0.2))" />
-          
-          {/* Header bar of window */}
-          <rect x="70" y="80" width="260" height="34" rx="16" fill="#1A2B4A" />
-          <rect x="70" y="100" width="260" height="14" fill="#1A2B4A" />
-          <circle cx="90" cy="97" r="4" fill="#EF4444" />
-          <circle cx="102" cy="97" r="4" fill="#E8A23A" />
-          <circle cx="114" cy="97" r="4" fill="#22C55E" />
-          <rect x="140" y="93" width="120" height="8" rx="4" fill="rgba(255,255,255,0.2)" />
-
-          {/* Report Card preview rows inside screen */}
-          <rect x="88" y="128" width="130" height="10" rx="5" fill="#1A2B4A" opacity="0.85" />
-          <rect x="88" y="146" width="90" height="7" rx="3.5" fill="#2D8C8C" opacity="0.6" />
-
-          {/* Mini Table Rows */}
-          <rect x="88" y="165" width="224" height="24" rx="6" fill="#EDF7F6" />
-          <rect x="98" y="172" width="60" height="10" rx="3" fill="#1A2B4A" opacity="0.7" />
-          <rect x="230" y="171" width="36" height="12" rx="4" fill="#22C55E" opacity="0.25" />
-          <rect x="235" y="174" width="26" height="6" rx="3" fill="#16A34A" />
-          <rect x="278" y="171" width="24" height="12" rx="4" fill="#2D8C8C" />
-
-          <rect x="88" y="196" width="224" height="24" rx="6" fill="#FFFFFF" />
-          <rect x="98" y="203" width="75" height="10" rx="3" fill="#1A2B4A" opacity="0.7" />
-          <rect x="230" y="202" width="36" height="12" rx="4" fill="#22C55E" opacity="0.25" />
-          <rect x="235" y="205" width="26" height="6" rx="3" fill="#16A34A" />
-          <rect x="278" y="202" width="24" height="12" rx="4" fill="#2D8C8C" />
-
-          <rect x="88" y="227" width="224" height="24" rx="6" fill="#EDF7F6" />
-          <rect x="98" y="234" width="50" height="10" rx="3" fill="#1A2B4A" opacity="0.7" />
-          <rect x="230" y="233" width="36" height="12" rx="4" fill="#E8A23A" opacity="0.25" />
-          <rect x="235" y="236" width="26" height="6" rx="3" fill="#C6821E" />
-          <rect x="278" y="233" width="24" height="12" rx="4" fill="#2D8C8C" />
-
-          {/* Student & Teacher Characters Representation */}
-          <circle cx="200" cy="310" r="48" fill="#FFFFFF" />
-          <circle cx="200" cy="295" r="22" fill="#1A2B4A" />
-          <path d="M165 348 C165 315, 235 315, 235 348" fill="#2D8C8C" />
-          {/* Graduation Cap Badge */}
-          <polygon points="200,265 224,275 200,285 176,275" fill="#E8A23A" />
-          <line x1="220" y1="277" x2="220" y2="290" stroke="#E8A23A" strokeWidth="2" />
-        </svg>
+    {/* Center 3D Floating Workstation Image with Luxury Glass Frame */}
+    <div className="hero-luxury-frame">
+      <div className="hero-luxury-frame-inner">
+        <img
+          src="/images/luxury/laptop-floating-docs.jpg"
+          alt="Edvance SMS Luxury 3D Telemetry Platform"
+          className="hero-luxury-main-img"
+        />
+        <div className="hero-glass-overlay">
+          <div className="glass-chip-top">
+            <span className="live-pulse-dot" />
+            <span>MINESEC Official Standard • Live Telemetry</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -92,14 +36,14 @@ const HeroCircularVisual = () => (
       </div>
     </div>
 
-    {/* Floating Badge 2: Top Right — Instant Report Generator */}
+    {/* Floating Badge 2: Top Right — Official 3D Report Card Generator */}
     <div className="floating-stat-badge badge-pos-top-right float-reverse">
-      <div className="stat-badge-icon badge-icon-blue">
+      <div className="stat-badge-icon badge-icon-teal">
         <FileCheck size={16} color="#2D8C8C" />
       </div>
       <div className="stat-badge-content">
-        <div className="stat-badge-title">Official Report Cards</div>
-        <div className="stat-badge-sub">MINESEC Compliant ✓</div>
+        <div className="stat-badge-title">Bilingual Report Cards</div>
+        <div className="stat-badge-sub">MINESEC & GCE Compliant ✓</div>
       </div>
     </div>
 
@@ -208,9 +152,9 @@ const Hero = () => (
             </div>
           </div>
 
-          {/* ── RIGHT: Circular Visual Framing & Floating Badges ── */}
+          {/* ── RIGHT: Luxury 3D Visual Framing & Floating Badges ── */}
           <div className="hero-visual reveal--right reveal reveal-delay-2">
-            <HeroCircularVisual />
+            <HeroLuxuryVisual />
           </div>
 
         </div>
