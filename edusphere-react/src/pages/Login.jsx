@@ -127,37 +127,39 @@ export default function Login() {
     boxSizing: 'border-box', transition: 'border-color 0.2s',
   };
 
-  const accentColor = schoolConfigCache?.primaryColor || '#064e3b';
+  const accentColor = schoolConfigCache?.primaryColor || '#2D8C8C';
 
   return (
     <div className="login-page-root">
-      {/* LEFT PANEL — Branding */}
+      {/* LEFT PANEL — Branding (Desktop) */}
       <div className="login-branding-panel">
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <a href="/">
-            <img src="/logo.png" alt="Edvance Logo" style={{ height: 60, width: 'auto', objectFit: 'contain' }} />
-          </a>
+        <div className="login-branding-logo">
+          <Link to="/">
+            <img
+              src="/images/logo-horizontal.png"
+              alt="Edvance Logo"
+              style={{ height: 52, width: 'auto', objectFit: 'contain' }}
+              onError={(e) => { e.target.src = '/logo.png'; }}
+            />
+          </Link>
         </div>
 
         {/* Hero Text */}
         <div className="login-branding-text">
-          <h1 style={{
-            fontFamily: T.fontSerif,
-            fontSize: 'clamp(32px, 4vw, 54px)', lineHeight: 1.15, color: T.text, margin: '0 0 16px',
-          }}>
+          <h1 className="login-branding-heading">
             Excellence in <br />
-            <span style={{ fontStyle: 'italic', color: accentColor }}>Education Management.</span>
+            <span>Education Management.</span>
           </h1>
-          <p style={{ color: T.muted, fontSize: 15, lineHeight: 1.6, maxWidth: 400, margin: 0 }}>
+          <p className="login-branding-sub">
             A comprehensive, secure, and intuitive platform designed to elevate the administrative and academic experience for your institution.
           </p>
         </div>
 
         {/* Footer */}
         <div className="login-branding-footer">
-          <div style={{ width: 40, height: 2, background: accentColor, marginBottom: 12 }} />
-          <p style={{ color: T.muted, fontSize: 13, margin: 0 }}>
+          <div className="login-branding-line" />
+          <p>
             Edvance Global Educational Solutions
           </p>
         </div>
@@ -167,10 +169,23 @@ export default function Login() {
       <div className="login-form-panel">
         <div className="login-form-card">
 
+          {/* Mobile brand header (visible on <= 900px) */}
+          <div className="login-mobile-brand-header">
+            <Link to="/">
+              <img
+                src="/images/logo-horizontal.png"
+                alt="Edvance Logo"
+                className="login-mobile-logo"
+                onError={(e) => { e.target.src = '/logo.png'; }}
+              />
+            </Link>
+            <span className="login-mobile-badge">Enterprise School Portal</span>
+          </div>
+
           {!isFirstLogin ? (
             <>
-              <div style={{ marginBottom: 32 }}>
-                <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 'clamp(26px, 3.5vw, 34px)', color: T.text, margin: '0 0 8px', fontWeight: 400 }}>
+              <div style={{ marginBottom: 28 }}>
+                <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 'clamp(24px, 3.5vw, 32px)', color: T.text, margin: '0 0 6px', fontWeight: 400 }}>
                   Welcome back
                 </h2>
                 <p style={{ color: T.muted, fontSize: 14, margin: 0 }}>
@@ -198,7 +213,7 @@ export default function Login() {
 
                 <button type="submit" disabled={loading} style={{
                   marginTop: 8, padding: '15px', borderRadius: 100, border: 'none',
-                  background: '#064e3b', color: 'white', fontFamily: T.fontSans,
+                  background: accentColor, color: 'white', fontFamily: T.fontSans,
                   fontSize: 15, fontWeight: 600, cursor: loading ? 'wait' : 'pointer',
                   letterSpacing: '0.2px', transition: 'opacity 0.2s',
                   opacity: loading ? 0.7 : 1,
