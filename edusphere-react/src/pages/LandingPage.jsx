@@ -21,16 +21,24 @@ function LandingPage() {
 
   // Intersection Observer for smooth reveal animations
   useEffect(() => {
+    // Immediately make all initial elements visible to ensure no blank screens on mobile or load
+    const makeAllVisible = () => {
+      document.querySelectorAll('.reveal, .reveal--left, .reveal--right').forEach((el) => {
+        el.classList.add('visible');
+      });
+    };
+
+    makeAllVisible();
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             entry.target.classList.add('visible');
-            observer.unobserve(entry.target);
           }
         });
       },
-      { threshold: 0.06, rootMargin: '0px 0px -40px 0px' }
+      { threshold: 0.01 }
     );
 
     document.querySelectorAll('.reveal, .reveal--left, .reveal--right').forEach((el) => observer.observe(el));
@@ -40,10 +48,12 @@ function LandingPage() {
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', makeAllVisible, { passive: true });
 
     return () => {
       observer.disconnect();
       window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', makeAllVisible);
     };
   }, []);
 

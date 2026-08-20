@@ -196,10 +196,9 @@ img { max-width: 100%; height: auto; display: block; }
 
 /* ── REVEAL ANIMATIONS ── */
 .reveal {
-  opacity: 0;
-  transform: translateY(22px);
-  transition: opacity 0.6s var(--ease-out), transform 0.6s var(--ease-out);
-  will-change: opacity, transform;
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.4s ease, transform 0.4s ease;
 }
 
 .reveal--right {
@@ -4769,13 +4768,14 @@ html, body {
    ══════════════════════════════════════════════════════════ */
 @media (max-width: 767px) {
   .sv-hero {
-    min-height: 100dvh !important;
+    min-height: auto !important;
+    height: auto !important;
     padding-top: 0 !important;
-    padding-bottom: 0 !important;
+    padding-bottom: 24px !important;
     display: flex !important;
     flex-direction: column !important;
     position: relative !important;
-    overflow: hidden !important;
+    overflow: visible !important;
   }
 
   .sv-hero-bg-img {
@@ -4801,11 +4801,14 @@ html, body {
 
   .sv-hero-content {
     padding-top: 80px !important;
-    padding-bottom: 24px !important;
+    padding-bottom: 32px !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: flex-start !important;
-    min-height: 100dvh !important;
+    min-height: auto !important;
+    height: auto !important;
+    position: relative !important;
+    z-index: 2 !important;
     gap: 0 !important;
   }
 
@@ -5637,27 +5640,22 @@ html, body {
     transition: transform 0.1s ease !important;
   }
 
-  /* Scroll-reveal on mobile */
+  /* Scroll-reveal on mobile — Always 100% visible to prevent blank screens */
   .reveal,
   .reveal--left,
   .reveal--right {
-    opacity: 0;
-    transform: translateY(22px);
-    transition: opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1),
-                transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity: 1 !important;
+    transform: none !important;
+    visibility: visible !important;
   }
 
   .reveal.visible,
   .reveal--left.visible,
   .reveal--right.visible {
-    opacity: 1;
-    transform: none;
+    opacity: 1 !important;
+    transform: none !important;
+    visibility: visible !important;
   }
-
-  .reveal-delay-1 { transition-delay: 0.05s !important; }
-  .reveal-delay-2 { transition-delay: 0.12s !important; }
-  .reveal-delay-3 { transition-delay: 0.2s !important; }
-  .reveal-delay-4 { transition-delay: 0.28s !important; }
 
   /* Scroll-lock when mobile menu is open */
   body.menu-open {
