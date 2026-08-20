@@ -459,7 +459,7 @@ export default function TeacherPortal() {
         
         {dashLoading ? <div style={{ display: 'flex', gap: 8, color: T.muted }}><Loader2 size={16} className="spin" /> Loading stats...</div> : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
               {[
                 { label: 'Total Students', value: dashData.students || 0, color: accent, icon: Users }, 
                 { label: 'Total Classes', value: dashData.classes || myClasses.length, color: '#059669', icon: BookOpen }, 
@@ -1437,6 +1437,46 @@ export default function TeacherPortal() {
       </div>}
 
       {/* DOCUMENT VIEWER MODAL */}
+      
+      {/* MOBILE BOTTOM NAVIGATION BAR */}
+      <div className="portal-bottom-nav print-hide">
+        <button
+          className={`portal-bottom-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}
+        >
+          <LayoutDashboard size={18} />
+          <span>Overview</span>
+        </button>
+        <button
+          className={`portal-bottom-nav-item ${activeTab === 'classes' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('classes'); setSidebarOpen(false); }}
+        >
+          <BookOpen size={18} />
+          <span>Classes</span>
+        </button>
+        <button
+          className={`portal-bottom-nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('attendance'); setSidebarOpen(false); }}
+        >
+          <CheckSquare size={18} />
+          <span>Attendance</span>
+        </button>
+        <button
+          className={`portal-bottom-nav-item ${activeTab === 'grading' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('grading'); setSidebarOpen(false); }}
+        >
+          <Award size={18} />
+          <span>Grades</span>
+        </button>
+        <button
+          className={`portal-bottom-nav-item ${activeTab === 'messages' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('messages'); setSidebarOpen(false); }}
+        >
+          <Mail size={18} />
+          <span>Inbox</span>
+        </button>
+      </div>
+
       <DocumentViewerModal file={viewingDoc} onClose={() => setViewingDoc(null)} accent={accent} />
     </div>
   );

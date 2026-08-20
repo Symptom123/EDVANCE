@@ -229,7 +229,7 @@ export default function StudentPortal() {
 
       {loading ? <p>Loading...</p> : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
             {[
               { label: 'Avg Score', value: Number(dashboardData.avgScore || 0).toFixed(1), color: accent },
               { label: 'Classes', value: dashboardData.classes || 0, color: '#059669' },
@@ -910,7 +910,7 @@ export default function StudentPortal() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
           <div><p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Academic Record</p><h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Grades & Results</h1></div>
-          <button onClick={() => alert('Report Card download coming soon')} style={{...btnStyle(accent)}}><Award size={16} /> Report Card</button>
+          <button onClick={() => window.print()} style={{...btnStyle(accent)}}><Award size={16} /> Report Card</button>
         </div>
         <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: T.fontSans }}>
@@ -919,14 +919,14 @@ export default function StudentPortal() {
               {loading ? <tr><td colSpan={4} style={{padding: 20}}>Loading...</td></tr> : Object.keys(grouped).length === 0 ? <tr><td colSpan={4} style={{padding: 20, color: T.muted}}>No grades recorded yet.</td></tr> : Object.entries(grouped).map(([cName, marks], i) => {
                 const total = marks.reduce((sum, m) => sum + m.score, 0);
                 const avg = total / marks.length;
-                const grade = avg >= 90 ? 'A' : avg >= 80 ? 'B' : avg >= 70 ? 'C' : avg >= 60 ? 'D' : 'F';
+                const grade = avg >= 16 ? 'A (Excellent)' : avg >= 14 ? 'B (Very Good)' : avg >= 12 ? 'C (Good)' : avg >= 10 ? 'D (Pass)' : 'F (Fail)';
                 return (
                   <tr key={i} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
                     <td style={{ padding: '14px 20px', fontWeight: 600, color: T.text }}>{cName}</td>
                     <td style={{ padding: '14px 20px', color: T.muted, fontSize: 13 }}>
                       {marks.map((m, j) => <span key={j} style={{marginRight: 8}}>{m.sequenceName}: <strong>{m.score}</strong></span>)}
                     </td>
-                    <td style={{ padding: '14px 20px', fontWeight: 700, color: T.text }}>{avg.toFixed(1)}%</td>
+                    <td style={{ padding: '14px 20px', fontWeight: 700, color: T.text }}>{avg.toFixed(1)} / 20</td>
                     <td style={{ padding: '14px 20px' }}><span style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 18, fontWeight: 400, color: accent }}>{grade}</span></td>
                   </tr>
                 );
@@ -983,7 +983,7 @@ export default function StudentPortal() {
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} style={{ textAlign: 'center', fontSize: 12, fontWeight: 600, color: T.light, marginBottom: 4 }}>{d}</div>)}
                 {Array.from({ length: 30 }, (_, i) => {
                   const day = i + 1;
-                  const status = getStatusForDay(day) || 'present'; // default present if no specific record (or empty)
+                  const status = getStatusForDay(day) || 'unrecorded'; // default present if no specific record (or empty)
                   // For demo, if no record, show neutral, but instruction said show calendar
                   return (
                     <div key={day} style={{ aspectRatio: '1', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 13, background: status === 'absent' ? '#fef2f2' : status === 'late' ? '#fffbeb' : rgba(accent, 0.1), color: status === 'absent' ? '#dc2626' : status === 'late' ? '#d97706' : accent, border: `1px solid ${status === 'absent' ? '#fecaca' : status === 'late' ? '#fde68a' : rgba(accent, 0.2)}` }}>{day}</div>
@@ -1248,6 +1248,46 @@ export default function StudentPortal() {
       </div>}
 
       {/* DOCUMENT VIEWER MODAL */}
+      
+      {/* MOBILE BOTTOM NAVIGATION BAR */}
+      <div className="portal-bottom-nav print-hide">
+        <button
+          className={`portal-bottom-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}
+        >
+          <LayoutDashboard size={18} />
+          <span>Dashboard</span>
+        </button>
+        <button
+          className={`portal-bottom-nav-item ${activeTab === 'classes' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('classes'); setSidebarOpen(false); }}
+        >
+          <BookOpen size={18} />
+          <span>Classes</span>
+        </button>
+        <button
+          className={`portal-bottom-nav-item ${activeTab === 'assignments' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('assignments'); setSidebarOpen(false); }}
+        >
+          <FileText size={18} />
+          <span>Homework</span>
+        </button>
+        <button
+          className={`portal-bottom-nav-item ${activeTab === 'grades' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('grades'); setSidebarOpen(false); }}
+        >
+          <Award size={18} />
+          <span>Grades</span>
+        </button>
+        <button
+          className={`portal-bottom-nav-item ${activeTab === 'inbox' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('inbox'); setSidebarOpen(false); }}
+        >
+          <Mail size={18} />
+          <span>Inbox</span>
+        </button>
+      </div>
+
       <DocumentViewerModal file={viewingDoc} onClose={() => setViewingDoc(null)} accent={accent} />
     </div>
   );

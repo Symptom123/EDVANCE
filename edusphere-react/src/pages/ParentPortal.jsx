@@ -216,7 +216,7 @@ export default function ParentPortal() {
         </div>
         
         {loadingDashboard ? <p style={{ color: T.muted }}>Loading dashboard...</p> : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
             {[
               { 
                 label: "Child's Attendance", 
@@ -253,9 +253,9 @@ export default function ParentPortal() {
   };
 
   const renderAttendance = () => {
-    const present = attendance.filter(a => a.status === 'Present').length;
-    const absent = attendance.filter(a => a.status === 'Absent').length;
-    const late = attendance.filter(a => a.status === 'Late').length;
+    const present = attendance.filter(a => String(a.status).toLowerCase() === 'present').length;
+    const absent = attendance.filter(a => String(a.status).toLowerCase() === 'absent').length;
+    const late = attendance.filter(a => String(a.status).toLowerCase() === 'late').length;
     const total = attendance.length;
     const pct = total > 0 ? Math.round((present + late) / total * 100) : 0;
 
@@ -517,7 +517,66 @@ export default function ParentPortal() {
   };
 
   const renderContent = () => {
-    if (children.length === 0) return <div style={{ padding: '44px 52px' }}><p style={{color: T.muted}}>Select a child from the sidebar or link a new child</p></div>;
+    
+    if (children.length === 0) {
+      return (
+        <div style={{ maxWidth: 520, margin: '40px auto', padding: '0 16px' }}>
+          <div style={{ ...cardStyle, textAlign: 'center', padding: '32px 24px' }}>
+            <div style={{ width: 56, height: 56, borderRadius: '50%', background: rgba(accent, 0.1), color: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <User size={28} />
+            </div>
+            <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 26, margin: '0 0 8px', color: T.text }}>Link Your Student</h2>
+            <p style={{ color: T.muted, fontSize: 14, margin: '0 0 24px', lineHeight: 1.5 }}>
+              Enter your child's student email and login password provided by the school administration to link their academic records.
+            </p>
+
+            {linkSuccess && (
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 16 }}>
+                ✓ {linkSuccess}
+              </div>
+            )}
+            {linkError && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 16 }}>
+                ⚠️ {linkError}
+              </div>
+            )}
+
+            <form onSubmit={handleLinkChild} style={{ display: 'flex', flexDirection: 'column', gap: 14, textAlign: 'left' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: T.text, marginBottom: 4 }}>Student Email</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="student@school.edvance.com"
+                  value={linkChildEmail}
+                  onChange={e => setLinkChildEmail(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: T.text, marginBottom: 4 }}>Student Password / Access Code</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={linkChildPass}
+                  onChange={e => setLinkChildPass(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isLinking}
+                style={{ ...btnStyle(accent), width: '100%', justifyContent: 'center', marginTop: 6, padding: '12px' }}
+              >
+                {isLinking ? 'Linking Student...' : 'Link Student Account →'}
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
     if (!selectedChild) return <div style={{ padding: '44px 52px' }}><p style={{color: T.muted}}>Select a child from the sidebar</p></div>;
 
     switch (activeTab) {
@@ -613,6 +672,46 @@ export default function ParentPortal() {
       </div>}
 
       {/* DOCUMENT VIEWER MODAL */}
+      
+      {/* MOBILE BOTTOM NAVIGATION BAR */}
+      <div className="portal-bottom-nav print-hide">
+        <button
+          className={`portal-bottom-nav-item ${activeTab === 'overview' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('overview'); setSidebarOpen(false); }}
+        >
+          <LayoutDashboard size={18} />
+          <span>Overview</span>
+        </button>
+        <button
+          className={`portal-bottom-nav-item ${activeTab === 'assignments' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('assignments'); setSidebarOpen(false); }}
+        >
+          <FileText size={18} />
+          <span>Homework</span>
+        </button>
+        <button
+          className={`portal-bottom-nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('attendance'); setSidebarOpen(false); }}
+        >
+          <CheckSquare size={18} />
+          <span>Attendance</span>
+        </button>
+        <button
+          className={`portal-bottom-nav-item ${activeTab === 'grades' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('grades'); setSidebarOpen(false); }}
+        >
+          <Award size={18} />
+          <span>Grades</span>
+        </button>
+        <button
+          className={`portal-bottom-nav-item ${activeTab === 'messages' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('messages'); setSidebarOpen(false); }}
+        >
+          <Mail size={18} />
+          <span>Teacher</span>
+        </button>
+      </div>
+
       <DocumentViewerModal file={viewingDoc} onClose={() => setViewingDoc(null)} accent={accent} />
     </div>
   );

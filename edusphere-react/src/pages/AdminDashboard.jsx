@@ -292,7 +292,7 @@ export default function AdminDashboard() {
         <p style={{ color: T.muted, margin: '8px 0 0', fontSize: 15 }}>Here's what's happening at {config.schoolName} today.</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
         {[
           { label: 'Teachers', value: dashboardStats.teachers ?? teachers.length, icon: Users, color: accent },
           { label: 'Students', value: dashboardStats.students ?? students.length, icon: GraduationCap, color: '#059669' },
@@ -363,7 +363,7 @@ export default function AdminDashboard() {
 
       <div>
         <p style={{ fontFamily: T.fontSans, fontWeight: 600, color: T.text, margin: '0 0 14px', fontSize: 15 }}>Quick Actions</p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
           {[{ label: 'Add Teacher', icon: Users, role: 'Teacher', view: 'teachers' }, { label: 'Add Student', icon: GraduationCap, role: 'Student', view: 'students' }, { label: 'Add Class', icon: BookOpen, view: 'classes' }].map(item => (
             <button key={item.label} onClick={() => { setActiveView(item.view); if (item.role) { setNewUserRole(item.role); setShowAddUser(true); } else setShowAddClass(true); }}
               style={{ ...cardStyle, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 14, border: `1.5px solid ${rgba(accent, 0.25)}`, transition: 'all 0.15s' }}>
@@ -392,7 +392,7 @@ export default function AdminDashboard() {
             <button onClick={() => setShowAddClass(false)} style={{ background: 'none', border: 'none', color: T.muted, cursor: 'pointer' }}><X size={18} /></button>
           </div>
           <form onSubmit={handleCreateClass}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 14 }}>
               {[{ label: 'Class Name', val: newClassName, set: setNewClassName, ph: 'e.g. JSS 1A' }, { label: 'Subject', val: newClassSubject, set: setNewClassSubject, ph: 'e.g. Mathematics' }, { label: 'Year / Level', val: newClassYear, set: setNewClassYear, ph: 'e.g. Year 7' }].map(f => (
                 <div key={f.label}><label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>{f.label}</label><input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph} style={inputStyle} /></div>
               ))}
