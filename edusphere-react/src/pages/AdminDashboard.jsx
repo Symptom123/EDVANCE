@@ -1005,6 +1005,45 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>}
+
+      {/* MOBILE BOTTOM NAVIGATION BAR */}
+      <div className="portal-bottom-nav print-hide">
+        <button
+          className={`portal-bottom-nav-item ${activeView === 'overview' ? 'active' : ''}`}
+          onClick={() => { setActiveView('overview'); setSidebarOpen(false); }}
+        >
+          <LayoutDashboard size={18} />
+          <span>Overview</span>
+        </button>
+        <button
+          className={`portal-bottom-nav-item ${activeView === 'teachers' ? 'active' : ''}`}
+          onClick={() => { setActiveView('teachers'); setSidebarOpen(false); }}
+        >
+          <Users size={18} />
+          <span>Teachers</span>
+        </button>
+        <button
+          className={`portal-bottom-nav-item ${activeView === 'students' ? 'active' : ''}`}
+          onClick={() => { setActiveView('students'); setSidebarOpen(false); }}
+        >
+          <GraduationCap size={18} />
+          <span>Students</span>
+        </button>
+        <button
+          className={`portal-bottom-nav-item ${activeView === 'classes' ? 'active' : ''}`}
+          onClick={() => { setActiveView('classes'); setSidebarOpen(false); }}
+        >
+          <BookOpen size={18} />
+          <span>Classes</span>
+        </button>
+        <button
+          className={`portal-bottom-nav-item ${activeView === 'reportcards' ? 'active' : ''}`}
+          onClick={() => { setActiveView('reportcards'); setSidebarOpen(false); }}
+        >
+          <FileText size={18} />
+          <span>Reports</span>
+        </button>
+      </div>
     </div>
   );
 }
