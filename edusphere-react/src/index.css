@@ -4521,3 +4521,74 @@ html, body {
   border: 1px solid #e2e8f0;
   cursor: pointer;
 }
+
+
+/* ══════════════════════════════════════════════════════════
+   NAVBAR ACTION BUTTONS — ELEGANT SINGLE-LINE PILLS
+   ══════════════════════════════════════════════════════════ */
+
+.nav-actions-cluster {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+
+.btn-nav-login {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-family: 'Open Sans', sans-serif !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  color: #1A2B4A !important;
+  background: #EDF7F6 !important;
+  border: 1px solid rgba(45, 140, 140, 0.25) !important;
+  padding: 0 18px !important;
+  height: 38px !important;
+  border-radius: 999px !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  line-height: 38px !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.btn-nav-login:hover {
+  background: #2D8C8C !important;
+  color: #ffffff !important;
+  border-color: #2D8C8C !important;
+  box-shadow: 0 4px 14px rgba(45, 140, 140, 0.25) !important;
+  transform: translateY(-1px) !important;
+}
+
+.btn-nav-primary {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  background: #2D8C8C !important;
+  color: #ffffff !important;
+  font-family: 'Open Sans', sans-serif !important;
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  padding: 0 20px !important;
+  height: 38px !important;
+  border-radius: 999px !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  line-height: 38px !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+  box-shadow: 0 4px 14px rgba(45, 140, 140, 0.3) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.btn-nav-primary:hover {
+  background: #237272 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 18px rgba(45, 140, 140, 0.4) !important;
+  color: #ffffff !important;
+}
