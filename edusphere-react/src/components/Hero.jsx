@@ -53,11 +53,11 @@ const FloatingBadges = () => (
 const Hero = () => (
   <section className="sv-hero" id="hero">
 
-    {/* ── Full-bleed crystal 3D background ── */}
+    {/* ── Full-bleed Cameroonian Student Background ── */}
     <div className="sv-hero-bg" aria-hidden="true">
       <img
-        src="/images/luxury/hero-bg-crystal.jpg"
-        alt=""
+        src="/images/luxury/hero-student-cameroon.jpg"
+        alt="Edvance Academic Excellence"
         className="sv-hero-bg-img"
       />
       {/* Cinematic multi-layer overlay for legibility */}
