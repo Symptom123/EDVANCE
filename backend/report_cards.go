@@ -756,19 +756,21 @@ func buildReportCardsForTerm(classID, schoolID, academicYear string, term int) [
 		Coefficient *float64
 		Seq1, Seq2, Seq3, Seq4, Exam *float64
 	}
-	marksMap := map[string]map[string]EntryRow{}
-	mRows, err := pgDB.Query(`
-		SELECT student_id, subject_id, sequence1, sequence2, sequence3, sequence4, exam, coefficient
-		FROM marks_entry
-		WHERE class_id=$1 AND term=$2
-		AND ($3='' OR school_id=$3)
-		AND ($4='' OR academic_year=$4)`,
-		classID, term, schoolID, academicYear)
-	if err != nil || mRows == nil {
-		if err != nil {
-			log.Printf("[ReportCards] marks query failed: %v", err)
+
+	// Helper: load marks for a specific term number into a map[studentId][subjectId]
+	loadMarksForTerm := func(t int) map[string]map[string]EntryRow {
+		mm := map[string]map[string]EntryRow{}
+		mRows, err := pgDB.Query(`
+			SELECT student_id, subject_id, sequence1, sequence2, sequence3, sequence4, exam, coefficient
+			FROM marks_entry
+			WHERE class_id=$1 AND term=$2
+			AND ($3='' OR school_id=$3)
+			AND ($4='' OR academic_year=$4)`,
+			classID, t, schoolID, academicYear)
+		if err != nil || mRows == nil {
+			if err != nil { log.Printf("[ReportCards] marks query term=%d failed: %v", t, err) }
+			return mm
 		}
-	} else {
 		defer mRows.Close()
 		for mRows.Next() {
 			var e EntryRow
@@ -776,9 +778,35 @@ func buildReportCardsForTerm(classID, schoolID, academicYear string, term int) [
 				log.Printf("[ReportCards] marks scan failed: %v", scanErr)
 				continue
 			}
-			if marksMap[e.StudentID] == nil { marksMap[e.StudentID] = map[string]EntryRow{} }
-			marksMap[e.StudentID][e.SubjectID] = e
+			if mm[e.StudentID] == nil { mm[e.StudentID] = map[string]EntryRow{} }
+			mm[e.StudentID][e.SubjectID] = e
 		}
+		return mm
+	}
+
+	// computeSubjectAvg computes a single subject average from an EntryRow for a term.
+	// For terms 1 and 2: avg of seq1 & seq2. Exam (if present) blends in at 40%.
+	computeSubjectAvg := func(entry EntryRow, exists bool) float64 {
+		if !exists { return 0 }
+		seqSum := 0.0; seqCount := 0
+		if entry.Seq1 != nil { seqSum += *entry.Seq1; seqCount++ }
+		if entry.Seq2 != nil { seqSum += *entry.Seq2; seqCount++ }
+		if seqCount == 0 { return 0 }
+		seqAvg := seqSum / float64(seqCount)
+		if entry.Exam != nil {
+			return math.Round((seqAvg*0.6+(*entry.Exam)*0.4)*100) / 100
+		}
+		return math.Round(seqAvg*100) / 100
+	}
+
+	// Load marks for current term
+	marksMap := loadMarksForTerm(term)
+
+	// For term 3: also load term 1 and term 2 marks for cumulative average
+	var marksMapT1, marksMapT2 map[string]map[string]EntryRow
+	if term == 3 {
+		marksMapT1 = loadMarksForTerm(1)
+		marksMapT2 = loadMarksForTerm(2)
 	}
 
 	if len(subjects) == 0 {
@@ -808,30 +836,72 @@ func buildReportCardsForTerm(classID, schoolID, academicYear string, term int) [
 				coef = *entry.Coefficient
 			}
 			if coef <= 0 { coef = 1.0 }
-			var seqAvg, subjectAvg float64
-			seqCount := 0; seqSum := 0.0
-			if exists {
-				if entry.Seq1 != nil { seqSum += *entry.Seq1; seqCount++ }
-				if entry.Seq2 != nil { seqSum += *entry.Seq2; seqCount++ }
-				if entry.Seq3 != nil { seqSum += *entry.Seq3; seqCount++ }
-				if entry.Seq4 != nil { seqSum += *entry.Seq4; seqCount++ }
-				if seqCount > 0 { seqAvg = seqSum / float64(seqCount) }
-				if entry.Exam != nil {
-					subjectAvg = seqAvg*0.6 + (*entry.Exam)*0.4
-				} else { subjectAvg = seqAvg }
-				subjectAvg = math.Round(subjectAvg*100) / 100
-				totalWeightedSum += subjectAvg * coef
-				totalCoef += coef
+
+			var subjectAvg float64
+
+			if term == 3 {
+				// Third-term cumulative: (T1_avg + T2_avg + T3_avg) / 3
+				t3Avg := computeSubjectAvg(entry, exists)
+
+				entryT1, exT1 := marksMapT1[stu.ID][subj.ID]
+				if !exT1 { entryT1, exT1 = marksMapT1[stu.ID][subj.Name] }
+				t1Avg := computeSubjectAvg(entryT1, exT1)
+
+				entryT2, exT2 := marksMapT2[stu.ID][subj.ID]
+				if !exT2 { entryT2, exT2 = marksMapT2[stu.ID][subj.Name] }
+				t2Avg := computeSubjectAvg(entryT2, exT2)
+
+				termCount := 0
+				cumSum := 0.0
+				if exT1 || t1Avg > 0 { cumSum += t1Avg; termCount++ }
+				if exT2 || t2Avg > 0 { cumSum += t2Avg; termCount++ }
+				if exists || t3Avg > 0 { cumSum += t3Avg; termCount++ }
+				if termCount > 0 {
+					subjectAvg = math.Round((cumSum/float64(termCount))*100) / 100
+				}
+
+				if subjectAvg > 0 || exists {
+					totalWeightedSum += subjectAvg * coef
+					totalCoef += coef
+				}
+
+				row := ReportSubjectEntry{
+					SubjectID: subj.ID, SubjectName: subj.Name, Coefficient: coef,
+					SeqAvg: t3Avg, SubjectAvg: subjectAvg, HasMarks: exists || exT1 || exT2,
+				}
+				if exists {
+					row.Sequence1 = entry.Seq1; row.Sequence2 = entry.Seq2
+					row.Sequence3 = entry.Seq3; row.Sequence4 = entry.Seq4; row.Exam = entry.Exam
+				}
+				subjectRows = append(subjectRows, row)
+			} else {
+				// Terms 1 and 2: standard computation
+				seqSum := 0.0; seqCount := 0
+				if exists {
+					if entry.Seq1 != nil { seqSum += *entry.Seq1; seqCount++ }
+					if entry.Seq2 != nil { seqSum += *entry.Seq2; seqCount++ }
+					if seqCount > 0 {
+						seqAvg := seqSum / float64(seqCount)
+						if entry.Exam != nil {
+							subjectAvg = math.Round((seqAvg*0.6+(*entry.Exam)*0.4)*100) / 100
+						} else {
+							subjectAvg = math.Round(seqAvg*100) / 100
+						}
+						totalWeightedSum += subjectAvg * coef
+						totalCoef += coef
+					}
+				}
+				row := ReportSubjectEntry{
+					SubjectID: subj.ID, SubjectName: subj.Name, Coefficient: coef,
+					SeqAvg: math.Round((seqSum/math.Max(float64(seqCount), 1))*100) / 100,
+					SubjectAvg: subjectAvg, HasMarks: exists,
+				}
+				if exists {
+					row.Sequence1 = entry.Seq1; row.Sequence2 = entry.Seq2
+					row.Sequence3 = entry.Seq3; row.Sequence4 = entry.Seq4; row.Exam = entry.Exam
+				}
+				subjectRows = append(subjectRows, row)
 			}
-			row := ReportSubjectEntry{
-				SubjectID: subj.ID, SubjectName: subj.Name, Coefficient: coef,
-				SeqAvg: math.Round(seqAvg*100) / 100, SubjectAvg: subjectAvg, HasMarks: exists,
-			}
-			if exists {
-				row.Sequence1 = entry.Seq1; row.Sequence2 = entry.Seq2
-				row.Sequence3 = entry.Seq3; row.Sequence4 = entry.Seq4; row.Exam = entry.Exam
-			}
-			subjectRows = append(subjectRows, row)
 		}
 		termAvg := 0.0
 		if totalCoef > 0 { termAvg = math.Round((totalWeightedSum/totalCoef)*100) / 100 }

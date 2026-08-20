@@ -3784,7 +3784,31 @@ html, body {
    PORTAL RESPONSIVE ARCHITECTURE (ADMIN, TEACHER, STUDENT, PARENT)
    ══════════════════════════════════════════════════════════ */
 
-/* Portal Mobile Sticky Header */
+.portal-layout-wrapper {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  background: #faf9f7;
+  box-sizing: border-box;
+}
+
+/* Desktop Sidebar */
+.portal-desktop-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 256px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  border-right: 1px solid #e2e8f0;
+  background: #ffffff;
+  z-index: 20;
+}
+
+/* Mobile Sticky Header */
 .portal-mobile-header {
   display: none;
   width: 100%;
@@ -3832,8 +3856,12 @@ html, body {
   border: 1px solid #dbeafe;
 }
 
-.portal-sidebar-overlay-close {
+/* Mobile Sliding Drawer */
+.portal-mobile-drawer {
   display: none;
+}
+
+.portal-sidebar-overlay-close {
   position: absolute;
   top: 14px;
   right: 14px;
@@ -3846,26 +3874,103 @@ html, body {
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
+  display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10;
 }
 
+.portal-sidebar-backdrop {
+  display: none;
+}
+
+/* Desktop Toolbar */
+.portal-desktop-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 24px;
+  border-bottom: 1px solid #f1f5f9;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 15;
+}
+
+.portal-desktop-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #475569;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.portal-desktop-toggle-btn:hover {
+  background: #f8fafc;
+  color: #1e293b;
+  border-color: #cbd5e1;
+}
+
+/* Main Content Area */
+.portal-main-content {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  min-height: 100vh;
+}
+
+.portal-inner-content {
+  padding: 24px 32px;
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Right Panel */
+.portal-right-panel {
+  width: 270px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  border-left: 1px solid #e2e8f0;
+  background: #ffffff;
+  padding: 24px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  z-index: 10;
+  box-sizing: border-box;
+}
+
 /* Responsive Breakpoint for all Portals (<= 860px) */
 @media (max-width: 860px) {
+  .portal-layout-wrapper {
+    flex-direction: column !important;
+    min-height: 100vh !important;
+  }
+
+  .portal-desktop-sidebar {
+    display: none !important;
+  }
+
   .portal-mobile-header {
     display: flex !important;
   }
 
-  .portal-sidebar-overlay-close {
+  .portal-mobile-drawer {
     display: flex !important;
-  }
-
-  .portal-layout-wrapper {
-    flex-direction: column !important;
-  }
-
-  .portal-sidebar {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
@@ -3874,13 +3979,21 @@ html, body {
     max-width: 85vw !important;
     height: 100vh !important;
     z-index: 1000 !important;
-    box-shadow: 4px 0 25px rgba(0, 0, 0, 0.15) !important;
-    transform: translateX(0) !important;
-    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    background: #ffffff !important;
+    box-shadow: 4px 0 25px rgba(0, 0, 0, 0.2) !important;
+    flex-direction: column !important;
     overflow-y: auto !important;
+    transform: translateX(0) !important;
+    animation: drawerSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+
+  @keyframes drawerSlideIn {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
   }
 
   .portal-sidebar-backdrop {
+    display: block !important;
     position: fixed !important;
     inset: 0 !important;
     background: rgba(15, 23, 42, 0.5) !important;
@@ -3891,11 +4004,11 @@ html, body {
 
   .portal-main-content {
     width: 100% !important;
-    padding: 0 !important;
+    min-height: auto !important;
   }
 
   .portal-inner-content {
-    padding: 16px 14px !important;
+    padding: 16px 12px !important;
   }
 
   .portal-desktop-toolbar {

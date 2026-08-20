@@ -8,7 +8,8 @@ import FileUploadDropzone from '../components/FileUploadDropzone';
 export default function StudentPortal() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 860 : true);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [config, setConfig] = useState(null);
   
@@ -1171,40 +1172,84 @@ export default function StudentPortal() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: T.pageBg, fontFamily: T.fontSans }}>
+    <div className="portal-layout-wrapper" style={{ minHeight: '100vh', display: 'flex', background: T.pageBg, fontFamily: T.fontSans }}>
 
       {/* MOBILE HEADER */}
       <div className="portal-mobile-header print-hide">
-        <button className="portal-mobile-menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle navigation">
-          {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+        <button className="portal-mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle navigation">
+          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-        <img src="/logo.png" alt="Edvance Logo" style={{ height: 28, objectFit: 'contain' }} />
+        <img src="/logo.png" alt="Edvance Logo" style={{ height: 30, objectFit: 'contain' }} />
         <span className="portal-mobile-role-badge">Student</span>
       </div>
 
-      {sidebarOpen && <div
-        className={`portal-sidebar print-hide portal-sidebar--open`}
-        style={{ width: 252, background: T.sidebarBg, borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 0, height: '100vh' }}
-      >
-        <button className="portal-sidebar-overlay-close" onClick={() => setSidebarOpen(false)} aria-label="Close menu">✕</button>
-        <div style={{ padding: '24px 20px', borderBottom: `1px solid ${T.borderLight}` }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <img src="/logo.png" alt="Edvance Logo" style={{ height: 48, objectFit: 'contain', alignSelf: 'flex-start' }} />
-            <span style={{ fontSize: 11, color: T.light, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Student Portal</span>
+      {/* MOBILE SLIDING DRAWER & BACKDROP */}
+      {mobileMenuOpen && (
+        <>
+          <div className="portal-mobile-drawer print-hide">
+            <button className="portal-sidebar-overlay-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">✕</button>
+            <div style={{ padding: '24px 20px', borderBottom: `1px solid ${T.borderLight}` }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <img src="/logo.png" alt="Edvance Logo" style={{ height: 44, objectFit: 'contain', alignSelf: 'flex-start' }} />
+                <span style={{ fontSize: 11, color: T.light, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Student Portal</span>
+              </div>
+            </div>
+            <nav style={{ flex: 1, padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
+              {navItems.map(item => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setMobileMenuOpen(false);
+                  }}
+                  style={navItemStyle(activeTab === item.id, accent)}
+                >
+                  <item.icon size={16} /> {item.label}
+                </button>
+              ))}
+            </nav>
+            <div style={{ padding: '16px 12px', borderTop: `1px solid ${T.borderLight}` }}>
+              <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444'), color: '#ef4444' }}>
+                <LogOut size={16} /> Sign Out
+              </button>
+            </div>
           </div>
-        </div>
-        <nav style={{ flex: 1, padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {navItems.map(item => (
-            <button key={item.id} onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }} style={navItemStyle(activeTab === item.id, accent)}>
-              <item.icon size={16} />{item.label}
+          <div className="portal-sidebar-backdrop" onClick={() => setMobileMenuOpen(false)} />
+        </>
+      )}
+
+      {/* DESKTOP PERMANENT SIDEBAR */}
+      {sidebarOpen && (
+        <aside
+          className="portal-desktop-sidebar print-hide"
+          style={{ width: 256, background: T.sidebarBg, borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 0, height: '100vh', zIndex: 20 }}
+        >
+          <div style={{ padding: '24px 20px', borderBottom: `1px solid ${T.borderLight}` }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <img src="/logo.png" alt="Edvance Logo" style={{ height: 44, objectFit: 'contain', alignSelf: 'flex-start' }} />
+              <span style={{ fontSize: 11, color: T.light, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Student Portal</span>
+            </div>
+          </div>
+          <nav style={{ flex: 1, padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
+            {navItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveTab(item.id);
+                }}
+                style={navItemStyle(activeTab === item.id, accent)}
+              >
+                <item.icon size={16} /> {item.label}
+              </button>
+            ))}
+          </nav>
+          <div style={{ padding: '16px 12px', borderTop: `1px solid ${T.borderLight}` }}>
+            <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444'), color: '#ef4444' }}>
+              <LogOut size={16} /> Sign Out
             </button>
-          ))}
-        </nav>
-        <div style={{ padding: '12px 10px', borderTop: `1px solid ${T.borderLight}` }}>
-          <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444'), color: '#ef4444' }}><LogOut size={16} />Sign Out</button>
-        </div>
-      </div>}
-      {sidebarOpen && <div className="portal-sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
+          </div>
+        </aside>
+      )}
 
       {/* MAIN */}
       <div className="print-main portal-main-content" style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
@@ -1221,67 +1266,68 @@ export default function StudentPortal() {
         <div className="portal-inner-content">{renderContent()}</div>
       </div>
 
-      {rightPanelOpen && <div className="portal-right-panel print-hide" style={{ width: 260, background: T.sidebarBg, borderLeft: `1px solid ${T.border}`, padding: '24px 18px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 22, position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
-        <div style={{ textAlign: 'center', paddingBottom: 18, borderBottom: `1px solid ${T.borderLight}` }}>
-          <div style={{ width: 60, height: 60, borderRadius: '50%', background: rgba(accent, 0.1), border: `2px solid ${rgba(accent, 0.25)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 24, color: accent }}>{name.charAt(0)}</div>
-          <p style={{ margin: '0 0 2px', fontWeight: 700, color: T.text, fontSize: 14 }}>{name}</p>
-          <span style={badge(accent, rgba(accent, 0.1))}>Student</span>
-        </div>
-        <div>
-          <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '1px' }}>Quick Stats</p>
-          {[{ label: 'Avg Score', value: Number(dashboardData.avgScore || 0).toFixed(1) }, { label: 'Classes', value: dashboardData.classes || 0 }, { label: 'Unread', value: dashboardData.unread || 0 }].map(s => (
-            <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${T.borderLight}` }}>
-              <span style={{ color: T.muted, fontSize: 13 }}>{s.label}</span>
-              <strong style={{ color: T.text }}>{s.value}</strong>
-            </div>
-          ))}
-        </div>
-        <div>
-          <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '1px' }}>Recent</p>
-          {dashboardData.unread > 0 && (
-            <div style={{ padding: '10px 0', borderBottom: `1px solid ${T.borderLight}`, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-              <div style={{ width: 7, height: 7, borderRadius: '50%', background: accent, marginTop: 4, flexShrink: 0 }} />
-              <div><p style={{ margin: 0, fontSize: 13, color: T.text }}>You have {dashboardData.unread} unread messages</p></div>
-            </div>
-          )}
-        </div>
-      </div>}
+      {/* DESKTOP RIGHT PANEL */}
+      {rightPanelOpen && (
+        <aside className="portal-right-panel print-hide" style={{ width: 260, background: T.sidebarBg, borderLeft: `1px solid ${T.border}`, padding: '24px 18px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 20, position: 'sticky', top: 0, height: '100vh', overflowY: 'auto', zIndex: 10 }}>
+          <div style={{ textAlign: 'center', paddingBottom: 18, borderBottom: `1px solid ${T.borderLight}` }}>
+            <div style={{ width: 60, height: 60, borderRadius: '50%', background: rgba(accent, 0.1), border: `2px solid ${rgba(accent, 0.25)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 24, color: accent }}>{name.charAt(0)}</div>
+            <p style={{ margin: '0 0 2px', fontWeight: 700, color: T.text, fontSize: 14 }}>{name}</p>
+            <span style={badge(accent, rgba(accent, 0.1))}>Student</span>
+          </div>
+          <div>
+            <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '1px' }}>Quick Stats</p>
+            {[{ label: 'Avg Score', value: Number(dashboardData.avgScore || 0).toFixed(1) }, { label: 'Classes', value: dashboardData.classes || 0 }, { label: 'Unread', value: dashboardData.unread || 0 }].map(s => (
+              <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${T.borderLight}` }}>
+                <span style={{ color: T.muted, fontSize: 13 }}>{s.label}</span>
+                <strong style={{ color: T.text }}>{s.value}</strong>
+              </div>
+            ))}
+          </div>
+          <div>
+            <p style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '1px' }}>Recent</p>
+            {dashboardData.unread > 0 && (
+              <div style={{ padding: '10px 0', borderBottom: `1px solid ${T.borderLight}`, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: accent, marginTop: 4, flexShrink: 0 }} />
+                <div><p style={{ margin: 0, fontSize: 13, color: T.text }}>You have {dashboardData.unread} unread messages</p></div>
+              </div>
+            )}
+          </div>
+        </aside>
+      )}
 
-      {/* DOCUMENT VIEWER MODAL */}
-      
       {/* MOBILE BOTTOM NAVIGATION BAR */}
       <div className="portal-bottom-nav print-hide">
         <button
           className={`portal-bottom-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}
+          onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }}
         >
           <LayoutDashboard size={18} />
           <span>Dashboard</span>
         </button>
         <button
           className={`portal-bottom-nav-item ${activeTab === 'classes' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('classes'); setSidebarOpen(false); }}
+          onClick={() => { setActiveTab('classes'); setMobileMenuOpen(false); }}
         >
           <BookOpen size={18} />
           <span>Classes</span>
         </button>
         <button
           className={`portal-bottom-nav-item ${activeTab === 'assignments' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('assignments'); setSidebarOpen(false); }}
+          onClick={() => { setActiveTab('assignments'); setMobileMenuOpen(false); }}
         >
           <FileText size={18} />
           <span>Homework</span>
         </button>
         <button
           className={`portal-bottom-nav-item ${activeTab === 'grades' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('grades'); setSidebarOpen(false); }}
+          onClick={() => { setActiveTab('grades'); setMobileMenuOpen(false); }}
         >
           <Award size={18} />
           <span>Grades</span>
         </button>
         <button
           className={`portal-bottom-nav-item ${activeTab === 'inbox' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('inbox'); setSidebarOpen(false); }}
+          onClick={() => { setActiveTab('inbox'); setMobileMenuOpen(false); }}
         >
           <Mail size={18} />
           <span>Inbox</span>

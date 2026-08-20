@@ -7,7 +7,8 @@ import DocumentViewerModal, { triggerFileDownload, formatFileSize } from '../com
 export default function ParentPortal() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
-  const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 860 : true);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [config, setConfig] = useState(null);
   
@@ -590,54 +591,124 @@ export default function ParentPortal() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: T.pageBg, fontFamily: T.fontSans }}>
+    <div className="portal-layout-wrapper" style={{ minHeight: '100vh', display: 'flex', background: T.pageBg, fontFamily: T.fontSans }}>
 
       {/* MOBILE HEADER */}
       <div className="portal-mobile-header print-hide">
-        <button className="portal-mobile-menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Toggle navigation">
-          {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+        <button className="portal-mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle navigation">
+          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-        <img src="/logo.png" alt="Edvance Logo" style={{ height: 28, objectFit: 'contain' }} />
+        <img src="/logo.png" alt="Edvance Logo" style={{ height: 30, objectFit: 'contain' }} />
         <span className="portal-mobile-role-badge">Parent</span>
       </div>
 
-      {sidebarOpen && <div
-        className={`portal-sidebar print-hide portal-sidebar--open`}
-        style={{ width: 256, background: T.sidebarBg, borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 0, height: '100vh' }}
-      >
-        <button className="portal-sidebar-overlay-close" onClick={() => setSidebarOpen(false)} aria-label="Close menu">✕</button>
+      {/* MOBILE SLIDING DRAWER & BACKDROP */}
+      {mobileMenuOpen && (
+        <>
+          <div className="portal-mobile-drawer print-hide">
+            <button className="portal-sidebar-overlay-close" onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">✕</button>
 
-        <div style={{ padding: '24px 20px', borderBottom: `1px solid ${T.borderLight}` }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <img src="/logo.png" alt="Edvance Logo" style={{ height: 48, objectFit: 'contain', alignSelf: 'flex-start' }} />
-            <span style={{ fontSize: 11, color: T.light, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Parent Portal</span>
+            <div style={{ padding: '24px 20px', borderBottom: `1px solid ${T.borderLight}` }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <img src="/logo.png" alt="Edvance Logo" style={{ height: 44, objectFit: 'contain', alignSelf: 'flex-start' }} />
+                <span style={{ fontSize: 11, color: T.light, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Parent Portal</span>
+              </div>
+            </div>
+
+            {/* Child selector */}
+            {children.length > 0 && (
+              <div style={{ padding: '12px 12px', borderBottom: `1px solid ${T.borderLight}` }}>
+                <p style={{ margin: '0 0 8px', fontSize: 11, color: T.muted, fontWeight: 600, textTransform: 'uppercase' }}>Child</p>
+                {children.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => {
+                      setSelectedChild(c);
+                      setMobileMenuOpen(false);
+                    }}
+                    style={{ ...navItemStyle(selectedChild?.id === c.id, accent), marginBottom: 2 }}
+                  >
+                    <User size={14} /> {c.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <nav style={{ flex: 1, padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
+              {navItems.map(item => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setMobileMenuOpen(false);
+                  }}
+                  style={navItemStyle(activeTab === item.id, accent)}
+                >
+                  <item.icon size={16} /> {item.label}
+                </button>
+              ))}
+            </nav>
+            <div style={{ padding: '16px 12px', borderTop: `1px solid ${T.borderLight}` }}>
+              <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444'), color: '#ef4444' }}>
+                <LogOut size={16} /> Sign Out
+              </button>
+            </div>
           </div>
-        </div>
+          <div className="portal-sidebar-backdrop" onClick={() => setMobileMenuOpen(false)} />
+        </>
+      )}
 
-        {/* Child selector */}
-        {children.length > 0 && (
-          <div style={{ padding: '12px 12px', borderBottom: `1px solid ${T.borderLight}` }}>
-            <p style={{ margin: '0 0 8px', fontSize: 11, color: T.muted, fontWeight: 600, textTransform: 'uppercase' }}>Child</p>
-            {children.map(c => (
-              <button key={c.id} onClick={() => { setSelectedChild(c); setSidebarOpen(false); }} style={{ ...navItemStyle(selectedChild?.id === c.id, accent), marginBottom: 2 }}>
-                <User size={14} />{c.name}
+      {/* DESKTOP PERMANENT SIDEBAR */}
+      {sidebarOpen && (
+        <aside
+          className="portal-desktop-sidebar print-hide"
+          style={{ width: 256, background: T.sidebarBg, borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 0, height: '100vh', zIndex: 20 }}
+        >
+          <div style={{ padding: '24px 20px', borderBottom: `1px solid ${T.borderLight}` }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <img src="/logo.png" alt="Edvance Logo" style={{ height: 44, objectFit: 'contain', alignSelf: 'flex-start' }} />
+              <span style={{ fontSize: 11, color: T.light, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Parent Portal</span>
+            </div>
+          </div>
+
+          {/* Child selector */}
+          {children.length > 0 && (
+            <div style={{ padding: '12px 12px', borderBottom: `1px solid ${T.borderLight}` }}>
+              <p style={{ margin: '0 0 8px', fontSize: 11, color: T.muted, fontWeight: 600, textTransform: 'uppercase' }}>Child</p>
+              {children.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => {
+                    setSelectedChild(c);
+                  }}
+                  style={{ ...navItemStyle(selectedChild?.id === c.id, accent), marginBottom: 2 }}
+                >
+                  <User size={14} /> {c.name}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <nav style={{ flex: 1, padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
+            {navItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveTab(item.id);
+                }}
+                style={navItemStyle(activeTab === item.id, accent)}
+              >
+                <item.icon size={16} /> {item.label}
               </button>
             ))}
-          </div>
-        )}
-
-        <nav style={{ flex: 1, padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {navItems.map(item => (
-            <button key={item.id} onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }} style={navItemStyle(activeTab === item.id, accent)}>
-              <item.icon size={16} />{item.label}
+          </nav>
+          <div style={{ padding: '16px 12px', borderTop: `1px solid ${T.borderLight}` }}>
+            <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444'), color: '#ef4444' }}>
+              <LogOut size={16} /> Sign Out
             </button>
-          ))}
-        </nav>
-        <div style={{ padding: '12px 10px', borderTop: `1px solid ${T.borderLight}` }}>
-          <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444'), color: '#ef4444' }}><LogOut size={16} />Sign Out</button>
-        </div>
-      </div>}
-      {sidebarOpen && <div className="portal-sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
+          </div>
+        </aside>
+      )}
 
       {/* MAIN */}
       <div className="print-main portal-main-content" style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
@@ -654,58 +725,59 @@ export default function ParentPortal() {
         <div className="portal-inner-content">{renderContent()}</div>
       </div>
 
-      {rightPanelOpen && <div className="portal-right-panel print-hide" style={{ width: 256, background: T.sidebarBg, borderLeft: `1px solid ${T.border}`, padding: '24px 18px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 20, position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
-        <div style={{ textAlign: 'center', paddingBottom: 16, borderBottom: `1px solid ${T.borderLight}` }}>
-          <div style={{ width: 56, height: 56, borderRadius: '50%', background: rgba(accent, 0.1), border: `2px solid ${rgba(accent, 0.25)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 22, color: accent }}>{name.charAt(0)}</div>
-          <p style={{ margin: '0 0 2px', fontWeight: 700, color: T.text, fontSize: 14 }}>{name}</p>
-          <span style={badge(accent, rgba(accent, 0.1))}>Guardian</span>
-        </div>
-        {selectedChild && (
-          <div>
-            <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '1px' }}>Viewing</p>
-            <div style={{ padding: '10px 12px', background: rgba(accent, 0.06), borderRadius: 8, border: `1px solid ${rgba(accent, 0.15)}` }}>
-              <p style={{ margin: 0, fontWeight: 600, color: T.text, fontSize: 13 }}>{selectedChild.name}</p>
-              <p style={{ margin: '2px 0 0', fontSize: 11, color: T.muted }}>{selectedChild.class_name || 'Student'}</p>
-            </div>
+      {/* DESKTOP RIGHT PANEL */}
+      {rightPanelOpen && (
+        <aside className="portal-right-panel print-hide" style={{ width: 260, background: T.sidebarBg, borderLeft: `1px solid ${T.border}`, padding: '24px 18px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 20, position: 'sticky', top: 0, height: '100vh', overflowY: 'auto', zIndex: 10 }}>
+          <div style={{ textAlign: 'center', paddingBottom: 18, borderBottom: `1px solid ${T.borderLight}` }}>
+            <div style={{ width: 60, height: 60, borderRadius: '50%', background: rgba(accent, 0.1), border: `2px solid ${rgba(accent, 0.25)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 24, color: accent }}>{name.charAt(0)}</div>
+            <p style={{ margin: '0 0 2px', fontWeight: 700, color: T.text, fontSize: 14 }}>{name}</p>
+            <span style={badge(accent, rgba(accent, 0.1))}>Guardian</span>
           </div>
-        )}
-      </div>}
+          {selectedChild && (
+            <div>
+              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '1px' }}>Viewing</p>
+              <div style={{ padding: '10px 12px', background: rgba(accent, 0.06), borderRadius: 8, border: `1px solid ${rgba(accent, 0.15)}` }}>
+                <p style={{ margin: 0, fontWeight: 600, color: T.text, fontSize: 13 }}>{selectedChild.name}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: T.muted }}>{selectedChild.class_name || 'Student'}</p>
+              </div>
+            </div>
+          )}
+        </aside>
+      )}
 
-      {/* DOCUMENT VIEWER MODAL */}
-      
       {/* MOBILE BOTTOM NAVIGATION BAR */}
       <div className="portal-bottom-nav print-hide">
         <button
           className={`portal-bottom-nav-item ${activeTab === 'overview' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('overview'); setSidebarOpen(false); }}
+          onClick={() => { setActiveTab('overview'); setMobileMenuOpen(false); }}
         >
           <LayoutDashboard size={18} />
           <span>Overview</span>
         </button>
         <button
           className={`portal-bottom-nav-item ${activeTab === 'assignments' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('assignments'); setSidebarOpen(false); }}
+          onClick={() => { setActiveTab('assignments'); setMobileMenuOpen(false); }}
         >
           <FileText size={18} />
           <span>Homework</span>
         </button>
         <button
           className={`portal-bottom-nav-item ${activeTab === 'attendance' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('attendance'); setSidebarOpen(false); }}
+          onClick={() => { setActiveTab('attendance'); setMobileMenuOpen(false); }}
         >
           <CheckSquare size={18} />
           <span>Attendance</span>
         </button>
         <button
           className={`portal-bottom-nav-item ${activeTab === 'grades' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('grades'); setSidebarOpen(false); }}
+          onClick={() => { setActiveTab('grades'); setMobileMenuOpen(false); }}
         >
           <Award size={18} />
           <span>Grades</span>
         </button>
         <button
           className={`portal-bottom-nav-item ${activeTab === 'messages' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('messages'); setSidebarOpen(false); }}
+          onClick={() => { setActiveTab('messages'); setMobileMenuOpen(false); }}
         >
           <Mail size={18} />
           <span>Teacher</span>

@@ -91,11 +91,11 @@ func (se *SyncEngine) SyncFromJSONToPostgres() error {
 			}
 		}
 		if school.ID == "" {
-			log.Printf("[Sync] ⚠️ School has no ID, skipping")
+			log.Printf("[Sync] School has no ID, skipping")
 			continue
 		}
 		if err := se.syncSchool(school); err != nil {
-			log.Printf("[Sync] ⚠️ Failed to sync school %s: %v", school.ID, err)
+			log.Printf("[Sync] Failed to sync school %s: %v", school.ID, err)
 		} else {
 			schoolCount++
 		}
@@ -106,7 +106,7 @@ func (se *SyncEngine) SyncFromJSONToPostgres() error {
 	for _, rawUser := range jsonData.Users {
 		var user User
 		if err := json.Unmarshal(rawUser, &user); err != nil {
-			log.Printf("[Sync] ⚠️ Failed to parse user: %v", err)
+			log.Printf("[Sync] Failed to parse user: %v", err)
 			continue
 		}
 		// Convert numeric ID to string if needed
@@ -118,11 +118,11 @@ func (se *SyncEngine) SyncFromJSONToPostgres() error {
 			}
 		}
 		if user.ID == "" {
-			log.Printf("[Sync] ⚠️ User has no ID, skipping")
+			log.Printf("[Sync] User has no ID, skipping")
 			continue
 		}
 		if err := se.syncUser(user); err != nil {
-			log.Printf("[Sync] ⚠️ Failed to sync user %s: %v", user.ID, err)
+			log.Printf("[Sync] Failed to sync user %s: %v", user.ID, err)
 		} else {
 			userCount++
 		}
@@ -133,11 +133,11 @@ func (se *SyncEngine) SyncFromJSONToPostgres() error {
 	for _, rawClass := range jsonData.Classes {
 		var class Class
 		if err := json.Unmarshal(rawClass, &class); err != nil {
-			log.Printf("[Sync] ⚠️ Failed to parse class: %v", err)
+			log.Printf("[Sync] Failed to parse class: %v", err)
 			continue
 		}
 		if err := se.syncClass(class); err != nil {
-			log.Printf("[Sync] ⚠️ Failed to sync class %s: %v", class.ID, err)
+			log.Printf("[Sync] Failed to sync class %s: %v", class.ID, err)
 		} else {
 			classCount++
 		}
@@ -151,14 +151,14 @@ func (se *SyncEngine) SyncFromJSONToPostgres() error {
 			link.ID = fmt.Sprintf("parent-link-%d", i)
 		}
 		if err := se.syncParentLink(link); err != nil {
-			log.Printf("[Sync] ⚠️ Failed to sync parent link: %v", err)
+			log.Printf("[Sync] Failed to sync parent link: %v", err)
 		} else {
 			linkCount++
 		}
 	}
 
 	se.lastSync = time.Now()
-	log.Printf("[Sync] ✅ Sync complete! Schools: %d | Users: %d | Classes: %d | Links: %d",
+	log.Printf("[Sync] Sync complete! Schools: %d | Users: %d | Classes: %d | Links: %d",
 		schoolCount, userCount, classCount, linkCount)
 
 	return nil
@@ -424,8 +424,10 @@ func syncOnConnectionRestoration() {
 		// If just came online, trigger sync
 		if currentOnline && !wasOnline {
 			log.Println("[Sync] 🔗 Connection restored! Starting automatic sync...")
-			if err := syncEngine.SyncFromJSONToPostgres(); err != nil {
-				log.Printf("[Sync] ❌ Auto-sync failed: %v", err)
+			if syncEngine != nil {
+				if err := syncEngine.SyncFromJSONToPostgres(); err != nil {
+					log.Printf("[Sync] ❌ Auto-sync failed: %v", err)
+				}
 			}
 			lastSyncAttempt = time.Now()
 		}
@@ -433,8 +435,10 @@ func syncOnConnectionRestoration() {
 		// Periodic sync every 5 minutes even if online (to catch updates)
 		if currentOnline && time.Since(lastSyncAttempt) > 5*time.Minute {
 			log.Println("[Sync] 🔄 Periodic sync check...")
-			if err := syncEngine.SyncFromJSONToPostgres(); err != nil {
-				log.Printf("[Sync] ❌ Periodic sync failed: %v", err)
+			if syncEngine != nil {
+				if err := syncEngine.SyncFromJSONToPostgres(); err != nil {
+					log.Printf("[Sync] ❌ Periodic sync failed: %v", err)
+				}
 			}
 			lastSyncAttempt = time.Now()
 		}
