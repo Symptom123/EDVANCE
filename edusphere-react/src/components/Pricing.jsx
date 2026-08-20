@@ -6,10 +6,6 @@ const Pricing = () => {
     <section className="pricing-section" id="pricing">
       <div className="container">
         <div className="pricing-header reveal">
-          <div className="section-eyebrow-pill">
-            <span className="eyebrow-dot" />
-            <span className="eyebrow-label">Transparent Investment</span>
-          </div>
           <h2 className="section-headline">
             Institutional plans with<br />
             <span className="text-blue">zero hidden surcharges</span>

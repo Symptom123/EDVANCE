@@ -31,10 +31,6 @@ const Showcase = () => {
     <section className="showcase-section" id="dashboard">
       <div className="container">
         <div className="showcase-header reveal">
-          <div className="section-eyebrow-pill">
-            <span className="eyebrow-dot" />
-            <span className="eyebrow-label">Interactive Telemetry</span>
-          </div>
           <h2 className="section-headline">
             Engineered for real African classrooms,<br />
             <span className="text-blue">not Silicon Valley theory</span>

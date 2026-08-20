@@ -39,10 +39,6 @@ const Contact = () => {
       <div className="container">
         <div className="contact-grid">
           <div className="contact-info reveal">
-            <div className="section-eyebrow-pill">
-              <span className="eyebrow-dot" />
-              <span className="eyebrow-label">Institutional Inquiries</span>
-            </div>
             <h2 className="section-headline">
               Speak directly with our<br />
               <span className="text-blue">regional leadership team</span>

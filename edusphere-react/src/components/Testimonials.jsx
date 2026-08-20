@@ -39,10 +39,6 @@ const Testimonials = () => {
     <section className="testimonials-section" id="testimonials">
       <div className="container">
         <div className="testi-header reveal">
-          <div className="section-eyebrow-pill">
-            <span className="eyebrow-dot" />
-            <span className="eyebrow-label">Institutional Endorsements</span>
-          </div>
           <h2 className="section-headline">
             Trusted by the principals<br />
             <span className="text-blue">shaping Africa's future</span>

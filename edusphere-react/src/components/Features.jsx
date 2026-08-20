@@ -137,11 +137,6 @@ const Features = () => {
       <div className="container" style={{ position: 'relative', zIndex: 1 }}>
         {/* Section Header */}
         <div className="solution-header reveal">
-          <div className="section-eyebrow-pill">
-            <span className="eyebrow-dot" />
-            <span className="eyebrow-label">Integrated Platform</span>
-          </div>
-
           <h2 className="section-headline">
             How Edvance transforms
             <br />

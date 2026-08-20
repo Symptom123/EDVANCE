@@ -72,11 +72,6 @@ const Hero = () => (
     {/* ── Content Layer ── */}
     <div className="container sv-hero-content">
 
-      {/* Eyebrow */}
-      <p className="sv-hero-eyebrow reveal reveal-delay-1">
-        The #1 African School Management Platform
-      </p>
-
       {/* Headline — editorial split style like Severna */}
       <h1 className="sv-hero-headline reveal reveal-delay-1">
         <span className="sv-headline-line sv-hl-light">Enterprise school</span>

@@ -6,10 +6,6 @@ const CtaSection = () => {
     <section className="cta-section" id="get-started">
       <div className="container">
         <div className="cta-inner reveal">
-          <div className="section-eyebrow-pill eyebrow-on-dark">
-            <span className="eyebrow-dot" />
-            <span className="eyebrow-label">Institutional Transformation</span>
-          </div>
           <h2 className="cta-headline">
             Ready to lead your school<br />
             <span className="text-blue-light">without spreadsheet chaos?</span>

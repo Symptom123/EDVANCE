@@ -55,10 +55,6 @@ const HowItWorks = () => {
         <div className="how-layout">
           {/* Left Column: Sticky Header */}
           <div className="how-sticky-header reveal">
-            <div className="section-eyebrow-pill">
-              <span className="eyebrow-dot" />
-              <span className="eyebrow-label">The 4-Step Workflow</span>
-            </div>
             <h2 className="section-headline">
               From raw marks<br />
               <span className="text-blue">to certified reports</span><br />
