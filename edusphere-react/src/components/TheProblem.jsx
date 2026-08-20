@@ -61,10 +61,6 @@ const TheProblem = () => (
       <div className="about-block-layout">
         {/* Left Column: Credibility, Checklist, Visual Image & Experience Badge */}
         <div className="about-credibility-col reveal">
-          <div className="section-eyebrow-pill">
-            <span className="eyebrow-dot" />
-            <span className="eyebrow-label">The Administrative Crisis</span>
-          </div>
 
           <h2 className="section-headline">
             Why 80% of African schools

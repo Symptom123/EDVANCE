@@ -50,35 +50,30 @@ const Header = () => {
   return (
     <>
       <header className={`site-header-wrapper ${scrolled ? 'is-scrolled' : ''}`} id="siteHeader">
-        {/* Tier 1: Dark Navy Utility Bar */}
+        {/* Tier 1: Stylish Navy-Green Half Bar */}
         <div className="top-utility-bar">
           <div className="container">
-            <div className="utility-bar-inner">
+            <div className="utility-bar-half-pill">
               <div className="utility-left">
                 <a href="tel:+237670000000" className="utility-link">
-                  <Phone size={13} className="utility-icon" />
+                  <Phone size={12} className="utility-icon" />
                   <span>+237 670 000 000</span>
                 </a>
                 <span className="utility-sep">•</span>
                 <a href="mailto:chancellery@edvance.io" className="utility-link">
-                  <Mail size={13} className="utility-icon" />
+                  <Mail size={12} className="utility-icon" />
                   <span>chancellery@edvance.io</span>
                 </a>
-                <span className="utility-sep d-none-mobile">•</span>
-                <span className="utility-text d-none-mobile">
-                  <MapPin size={13} className="utility-icon" />
-                  <span>Bastos Diplomatic Quarter, Yaoundé</span>
-                </span>
               </div>
 
               <div className="utility-right">
                 <span className="utility-badge">
                   <Shield size={12} className="utility-badge-icon" />
-                  <span>MINESEC & GCE Board Compliant</span>
+                  <span>MINESEC & GCE Compliant</span>
                 </span>
                 <span className="utility-sep">•</span>
                 <div className="utility-lang">
-                  <Globe size={13} className="utility-icon" />
+                  <Globe size={12} className="utility-icon" />
                   <span>Bilingual (EN / FR)</span>
                 </div>
               </div>

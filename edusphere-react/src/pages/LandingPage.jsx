@@ -5,7 +5,6 @@ import TheProblem from '../components/TheProblem';
 import Features from '../components/Features';
 import Showcase from '../components/Showcase';
 import HowItWorks from '../components/HowItWorks';
-import Metrics from '../components/Metrics';
 import Testimonials from '../components/Testimonials';
 import Pricing from '../components/Pricing';
 import FAQ from '../components/FAQ';
@@ -82,10 +81,7 @@ function LandingPage() {
         {/* Section 5: How It Works */}
         <HowItWorks />
 
-        {/* Section 6: Metrics Strip */}
-        <Metrics />
-
-        {/* Section 7: Social Proof */}
+        {/* Section 6: Social Proof */}
         <Testimonials />
 
         {/* Section 8: Pricing */}

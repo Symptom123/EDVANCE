@@ -72,12 +72,6 @@ const Hero = () => (
     {/* ── Content Layer ── */}
     <div className="container sv-hero-content">
 
-      {/* Live pill */}
-      <div className="sv-live-pill reveal">
-        <span className="sv-live-dot" />
-        <span>MINESEC Certified · Live Telemetry</span>
-      </div>
-
       {/* Eyebrow */}
       <p className="sv-hero-eyebrow reveal reveal-delay-1">
         The #1 African School Management Platform
