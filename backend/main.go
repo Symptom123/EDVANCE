@@ -38,14 +38,17 @@ type FeatureFlags struct {
 }
 
 type School struct {
-	ID           string       `json:"ID"`
-	Name         string       `json:"name"`
-	PrimaryColor string       `json:"primaryColor"`
-	HasPrimary   bool         `json:"hasPrimary"`
-	HasSecondary bool         `json:"hasSecondary"`
-	ConfigJSON   string       `json:"configJson"`
-	AdminID      string       `json:"adminId"`
-	Features     FeatureFlags `json:"features"`
+	ID              string       `json:"ID"`
+	Name            string       `json:"name"`
+	SchoolName      string       `json:"schoolName,omitempty"`
+	PrimaryColor    string       `json:"primaryColor"`
+	HasPrimary      bool         `json:"hasPrimary"`
+	HasSecondary    bool         `json:"hasSecondary"`
+	ConfigJSON      string       `json:"configJson"`
+	AdminID         string       `json:"adminId"`
+	Features        FeatureFlags `json:"features"`
+	ClassNamingType string       `json:"classNamingType"`
+	SectionConfig   string       `json:"sectionConfig"`
 }
 
 type User struct {
@@ -59,17 +62,24 @@ type User struct {
 }
 
 type Class struct {
-	ID           string  `json:"ID"`
-	SchoolID     string  `json:"schoolId"`
-	Name         string  `json:"name"`
-	Subsystem    string  `json:"subsystem"`
-	Level        string  `json:"level"`
-	Section      string  `json:"section"`
-	PassMark     float64 `json:"passMark"`
-	AcademicYear string  `json:"academicYear"`
-	Subject      string  `json:"subject"`
-	TeacherID    string  `json:"teacherId"`
-	Year         string  `json:"year"`
+	ID            string  `json:"ID"`
+	SchoolID      string  `json:"schoolId"`
+	Name          string  `json:"name"`
+	FullClassName string  `json:"fullClassName"`
+	ClassCode     string  `json:"classCode"`
+	Capacity      int     `json:"capacity"`
+	LevelID       string  `json:"levelId"`
+	CreatedByType string  `json:"createdByType"`
+	CustomOrder   int     `json:"customOrder"`
+	Subsystem     string  `json:"subsystem"`
+	Level         string  `json:"level"`
+	Section       string  `json:"section"`
+	PassMark      float64 `json:"passMark"`
+	AcademicYear  string  `json:"academicYear"`
+	Subject       string  `json:"subject"`
+	TeacherID     string  `json:"teacherId"`
+	Year          string  `json:"year"`
+	StudentCount  int     `json:"studentCount,omitempty"`
 }
 
 type ParentStudentLink struct {
@@ -320,6 +330,17 @@ func migrateSchema() {
 		`ALTER TABLE course_subjects ADD COLUMN IF NOT EXISTS teacher_id VARCHAR(36)`,
 		`ALTER TABLE marks_entry ADD COLUMN IF NOT EXISTS coefficient REAL DEFAULT 1.0`,
 		`ALTER TABLE schools ADD COLUMN IF NOT EXISTS subsystem TEXT DEFAULT 'anglophone'`,
+		`ALTER TABLE schools ADD COLUMN IF NOT EXISTS class_naming_type TEXT DEFAULT 'STANDARD'`,
+		`ALTER TABLE schools ADD COLUMN IF NOT EXISTS section_config TEXT DEFAULT 'NONE'`,
+		`ALTER TABLE classes ADD COLUMN IF NOT EXISTS full_class_name TEXT DEFAULT ''`,
+		`ALTER TABLE classes ADD COLUMN IF NOT EXISTS class_code TEXT DEFAULT ''`,
+		`ALTER TABLE classes ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 45`,
+		`ALTER TABLE classes ADD COLUMN IF NOT EXISTS level_id TEXT DEFAULT ''`,
+		`ALTER TABLE classes ADD COLUMN IF NOT EXISTS created_by_type TEXT DEFAULT 'STANDARD_AUTO'`,
+		`ALTER TABLE classes ADD COLUMN IF NOT EXISTS custom_order INTEGER DEFAULT 0`,
+		`UPDATE classes SET full_class_name = name WHERE full_class_name = '' OR full_class_name IS NULL`,
+		`UPDATE schools SET class_naming_type = 'STANDARD' WHERE class_naming_type = '' OR class_naming_type IS NULL`,
+		`UPDATE schools SET section_config = 'NONE' WHERE section_config = '' OR section_config IS NULL`,
 	}
 	for _, q := range queries {
 		if _, err := pgDB.Exec(q); err != nil {
@@ -558,11 +579,76 @@ func replayAction(action SyncAction) error {
 func scanSchool(row *sql.Row) (School, error) {
 	var s School
 	var featJSON string
-	err := row.Scan(&s.ID, &s.Name, &s.PrimaryColor, &s.HasPrimary, &s.HasSecondary, &s.ConfigJSON, &s.AdminID, &featJSON)
+	var classNamingType, sectionConfig sql.NullString
+	err := row.Scan(&s.ID, &s.Name, &s.PrimaryColor, &s.HasPrimary, &s.HasSecondary, &s.ConfigJSON, &s.AdminID, &featJSON, &classNamingType, &sectionConfig)
 	if err == nil {
 		json.Unmarshal([]byte(featJSON), &s.Features)
+		s.SchoolName = s.Name
+		if classNamingType.Valid && classNamingType.String != "" {
+			s.ClassNamingType = classNamingType.String
+		} else {
+			s.ClassNamingType = "STANDARD"
+		}
+		if sectionConfig.Valid && sectionConfig.String != "" {
+			s.SectionConfig = sectionConfig.String
+		} else {
+			s.SectionConfig = "NONE"
+		}
 	}
 	return s, err
+}
+
+func generateClassCode(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "CLS"
+	}
+	words := strings.Fields(strings.ReplaceAll(strings.ReplaceAll(name, "-", " "), "_", " "))
+	var code strings.Builder
+	for _, w := range words {
+		w = strings.TrimSpace(w)
+		if len(w) == 0 {
+			continue
+		}
+		upper := strings.ToUpper(w)
+		if upper == "FORM" {
+			code.WriteString("F")
+		} else if upper == "CLASS" {
+			code.WriteString("C")
+		} else if upper == "PRIMARY" {
+			code.WriteString("P")
+		} else if upper == "SECONDARY" {
+			code.WriteString("S")
+		} else if upper == "LOWER" {
+			code.WriteString("L")
+		} else if upper == "UPPER" {
+			code.WriteString("U")
+		} else if upper == "SIXTH" {
+			code.WriteString("6")
+		} else if upper == "ADVANCED" {
+			code.WriteString("ADV")
+		} else if upper == "SCIENCE" {
+			code.WriteString("S")
+		} else if upper == "ARTS" {
+			code.WriteString("A")
+		} else if upper == "COMMERCIAL" {
+			code.WriteString("COM")
+		} else {
+			if len(w) == 1 || (w[0] >= '0' && w[0] <= '9') {
+				code.WriteString(upper)
+			} else {
+				code.WriteByte(upper[0])
+			}
+		}
+	}
+	res := code.String()
+	if len(res) > 10 {
+		res = res[:10]
+	}
+	if res == "" {
+		res = "CLS"
+	}
+	return res
 }
 
 func jsonResp(w http.ResponseWriter, data interface{}) {
@@ -616,7 +702,10 @@ func main() {
 	r.Post("/api/users", createUser)
 	r.Delete("/api/users/{id}", deleteUser)
 	r.Get("/api/classes", listClasses)
+	r.Get("/api/classes/{id}", listClasses)
 	r.Post("/api/classes", createClass)
+	r.Post("/api/classes/{id}", createClass)
+	r.Put("/api/classes/{id}", updateClass)
 	r.Delete("/api/classes/{id}", deleteClass)
 	r.Put("/api/classes/{id}/pass-mark", updateClassPassMark)
 	r.Post("/api/classes/rollover", rolloverClasses)
@@ -736,14 +825,16 @@ func main() {
 // =====================================================================
 
 type CreateSchoolRequest struct {
-	AdminName    string `json:"adminName"`
-	AdminEmail   string `json:"adminEmail"`
-	AdminPass    string `json:"adminPass"`
-	SchoolName   string `json:"schoolName"`
-	PrimaryColor string `json:"primaryColor"`
-	HasPrimary   bool   `json:"hasPrimary"`
-	HasSecondary bool   `json:"hasSecondary"`
-	ConfigJSON   string `json:"configJson"`
+	AdminName       string `json:"adminName"`
+	AdminEmail      string `json:"adminEmail"`
+	AdminPass       string `json:"adminPass"`
+	SchoolName      string `json:"schoolName"`
+	PrimaryColor    string `json:"primaryColor"`
+	HasPrimary      bool   `json:"hasPrimary"`
+	HasSecondary    bool   `json:"hasSecondary"`
+	ConfigJSON      string `json:"configJson"`
+	ClassNamingType string `json:"classNamingType"`
+	SectionConfig   string `json:"sectionConfig"`
 }
 
 func createSchool(w http.ResponseWriter, r *http.Request) {
@@ -755,15 +846,38 @@ func createSchool(w http.ResponseWriter, r *http.Request) {
 	schoolID := uuid.New().String()
 	adminID := uuid.New().String()
 
-	school := School{ID: schoolID, Name: req.SchoolName, PrimaryColor: req.PrimaryColor,
-		HasPrimary: req.HasPrimary, HasSecondary: req.HasSecondary, ConfigJSON: req.ConfigJSON,
-		AdminID: adminID, Features: FeatureFlags{true, true, true, true, true, true}}
-	admin := User{ID: adminID, SchoolID: schoolID, Name: req.AdminName, Email: req.AdminEmail,
-		Password: req.AdminPass, Role: "Admin", FirstLogin: false}
+	if req.ClassNamingType == "" {
+		req.ClassNamingType = "STANDARD"
+	}
+	if req.SectionConfig == "" {
+		req.SectionConfig = "NONE"
+	}
+
+	school := School{
+		ID:              schoolID,
+		Name:            req.SchoolName,
+		PrimaryColor:    req.PrimaryColor,
+		HasPrimary:      req.HasPrimary,
+		HasSecondary:    req.HasSecondary,
+		ConfigJSON:      req.ConfigJSON,
+		AdminID:         adminID,
+		Features:        FeatureFlags{true, true, true, true, true, true},
+		ClassNamingType: req.ClassNamingType,
+		SectionConfig:   req.SectionConfig,
+	}
+	admin := User{
+		ID:         adminID,
+		SchoolID:   schoolID,
+		Name:       req.AdminName,
+		Email:      req.AdminEmail,
+		Password:   req.AdminPass,
+		Role:       "Admin",
+		FirstLogin: false,
+	}
 
 	if isOnline() {
-		if _, err := pgDB.Exec(`INSERT INTO schools(id,name,primary_color,has_primary,has_secondary,config_json,admin_id,features) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
-			school.ID, school.Name, school.PrimaryColor, school.HasPrimary, school.HasSecondary, school.ConfigJSON, school.AdminID, featuresJSON(school.Features)); err != nil {
+		if _, err := pgDB.Exec(`INSERT INTO schools(id,name,primary_color,has_primary,has_secondary,config_json,admin_id,features,class_naming_type,section_config) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+			school.ID, school.Name, school.PrimaryColor, school.HasPrimary, school.HasSecondary, school.ConfigJSON, school.AdminID, featuresJSON(school.Features), school.ClassNamingType, school.SectionConfig); err != nil {
 			log.Printf("[createSchool] INSERT school error: %v", err)
 			http.Error(w, fmt.Sprintf("Failed to save school to database: %v", err), http.StatusInternalServerError)
 			return
@@ -787,13 +901,80 @@ func createSchool(w http.ResponseWriter, r *http.Request) {
 		enqueue("CREATE_SCHOOL", school)
 		enqueue("CREATE_USER", admin)
 	}
-	jsonResp(w, map[string]interface{}{"schoolId": schoolID, "adminId": adminID, "message": "School created"})
+
+	// Auto-generate standard classes if STANDARD naming type
+	if strings.EqualFold(req.ClassNamingType, "STANDARD") {
+		var levels []string
+		if req.HasSecondary {
+			levels = append(levels, "Form 1", "Form 2", "Form 3", "Form 4", "Form 5", "Lower Sixth", "Upper Sixth")
+		}
+		if req.HasPrimary {
+			levels = append(levels, "Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6")
+		}
+
+		var sectionSuffixes []string
+		switch req.SectionConfig {
+		case "2_SECTIONS":
+			sectionSuffixes = []string{"A", "B"}
+		case "3_SECTIONS":
+			sectionSuffixes = []string{"A", "B", "C"}
+		case "4_SECTIONS":
+			sectionSuffixes = []string{"A", "B", "C", "D"}
+		default:
+			sectionSuffixes = []string{""}
+		}
+
+		orderIndex := 1
+		for _, lvl := range levels {
+			for _, sfx := range sectionSuffixes {
+				className := lvl
+				if sfx != "" {
+					className = fmt.Sprintf("%s %s", lvl, sfx)
+				}
+				clsCode := generateClassCode(className)
+				clsID := uuid.New().String()
+				newClass := Class{
+					ID:            clsID,
+					SchoolID:      schoolID,
+					Name:          className,
+					FullClassName: className,
+					ClassCode:     clsCode,
+					Capacity:      45,
+					CreatedByType: "STANDARD_AUTO",
+					CustomOrder:   orderIndex,
+					Subsystem:     "anglophone",
+					Level:         lvl,
+					Section:       sfx,
+					PassMark:      10.0,
+					AcademicYear:  "2026/2027",
+				}
+				orderIndex++
+
+				if isOnline() {
+					pgDB.Exec(`INSERT INTO classes(id,school_id,name,full_class_name,class_code,capacity,created_by_type,custom_order,subsystem,level,section,pass_mark,academic_year,subject,teacher_id,year)
+						VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+						newClass.ID, newClass.SchoolID, newClass.Name, newClass.FullClassName, newClass.ClassCode,
+						newClass.Capacity, newClass.CreatedByType, newClass.CustomOrder,
+						newClass.Subsystem, newClass.Level, newClass.Section, newClass.PassMark, newClass.AcademicYear,
+						newClass.Subject, newClass.TeacherID, newClass.Year)
+				} else {
+					localDBMu.Lock()
+					localDB.Classes = append(localDB.Classes, newClass)
+					saveLocalDB()
+					localDBMu.Unlock()
+					enqueue("CREATE_CLASS", newClass)
+				}
+			}
+		}
+	}
+
+	jsonResp(w, map[string]interface{}{"schoolId": schoolID, "adminId": adminID, "message": "School created", "classNamingType": school.ClassNamingType, "sectionConfig": school.SectionConfig})
 }
 
 func getSchool(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if isOnline() {
-		row := pgDB.QueryRow(`SELECT id,name,primary_color,has_primary,has_secondary,config_json,admin_id,features FROM schools WHERE id=$1`, id)
+		row := pgDB.QueryRow(`SELECT id,name,primary_color,has_primary,has_secondary,config_json,admin_id,features, COALESCE(class_naming_type, 'STANDARD'), COALESCE(section_config, 'NONE') FROM schools WHERE id=$1`, id)
 		s, err := scanSchool(row)
 		if err != nil {
 			http.Error(w, "School not found", http.StatusNotFound)
@@ -1121,22 +1302,30 @@ func deleteUser(w http.ResponseWriter, r *http.Request) {
 
 func listClasses(w http.ResponseWriter, r *http.Request) {
 	schoolID := r.URL.Query().Get("schoolId")
+	if schoolID == "" {
+		schoolID = chi.URLParam(r, "id")
+	}
 	academicYear := r.URL.Query().Get("academicYear")
 	if schoolID == "undefined" || schoolID == "null" { schoolID = "" }
 	var list []Class
 	if isOnline() {
-		q := `SELECT id, school_id, name, COALESCE(subsystem,'anglophone'), COALESCE(level,''), COALESCE(section,''), COALESCE(pass_mark, 10.0), COALESCE(academic_year,'2026/2027'), COALESCE(subject,''), COALESCE(teacher_id,''), COALESCE(year,'') FROM classes WHERE 1=1`
+		q := `SELECT c.id, c.school_id, c.name, COALESCE(NULLIF(c.full_class_name, ''), c.name), COALESCE(c.class_code,''), COALESCE(c.capacity, 45), COALESCE(c.created_by_type, 'STANDARD_AUTO'), COALESCE(c.custom_order, 0), COALESCE(c.subsystem,'anglophone'), COALESCE(c.level,''), COALESCE(c.section,''), COALESCE(c.pass_mark, 10.0), COALESCE(c.academic_year,'2026/2027'), COALESCE(c.subject,''), COALESCE(c.teacher_id,''), COALESCE(c.year,''),
+			(SELECT COUNT(*) FROM enrollments WHERE class_id = c.id) AS student_count
+			FROM classes c WHERE 1=1`
 		args := []interface{}{}
 		n := 1
-		if schoolID != "" { q += fmt.Sprintf(" AND school_id=$%d", n); args = append(args, schoolID); n++ }
-		if academicYear != "" { q += fmt.Sprintf(" AND academic_year=$%d", n); args = append(args, academicYear); n++ }
-		q += " ORDER BY level ASC, name ASC"
+		if schoolID != "" { q += fmt.Sprintf(" AND c.school_id=$%d", n); args = append(args, schoolID); n++ }
+		if academicYear != "" { q += fmt.Sprintf(" AND c.academic_year=$%d", n); args = append(args, academicYear); n++ }
+		q += " ORDER BY c.custom_order ASC, c.level ASC, c.name ASC"
 		rows, err := pgDB.Query(q, args...)
 		if err == nil && rows != nil {
 			defer rows.Close()
 			for rows.Next() {
 				var c Class
-				rows.Scan(&c.ID, &c.SchoolID, &c.Name, &c.Subsystem, &c.Level, &c.Section, &c.PassMark, &c.AcademicYear, &c.Subject, &c.TeacherID, &c.Year)
+				rows.Scan(&c.ID, &c.SchoolID, &c.Name, &c.FullClassName, &c.ClassCode, &c.Capacity, &c.CreatedByType, &c.CustomOrder, &c.Subsystem, &c.Level, &c.Section, &c.PassMark, &c.AcademicYear, &c.Subject, &c.TeacherID, &c.Year, &c.StudentCount)
+				if c.FullClassName != "" {
+					c.Name = c.FullClassName
+				}
 				list = append(list, c)
 			}
 		}
@@ -1146,6 +1335,9 @@ func listClasses(w http.ResponseWriter, r *http.Request) {
 		for _, c := range localDB.Classes {
 			if schoolID != "" && c.SchoolID != schoolID { continue }
 			if academicYear != "" && c.AcademicYear != "" && c.AcademicYear != academicYear { continue }
+			if c.FullClassName != "" {
+				c.Name = c.FullClassName
+			}
 			list = append(list, c)
 		}
 	}
@@ -1154,16 +1346,22 @@ func listClasses(w http.ResponseWriter, r *http.Request) {
 }
 
 type CreateClassRequest struct {
-	SchoolID     string  `json:"schoolId"`
-	Name         string  `json:"name"`
-	Subsystem    string  `json:"subsystem"`
-	Level        string  `json:"level"`
-	Section      string  `json:"section"`
-	PassMark     float64 `json:"passMark"`
-	AcademicYear string  `json:"academicYear"`
-	Subject      string  `json:"subject"`
-	TeacherID    string  `json:"teacherId"`
-	Year         string  `json:"year"`
+	SchoolID      string  `json:"schoolId"`
+	Name          string  `json:"name"`
+	FullClassName string  `json:"fullClassName"`
+	ClassCode     string  `json:"classCode"`
+	Capacity      int     `json:"capacity"`
+	LevelID       string  `json:"levelId"`
+	CreatedByType string  `json:"createdByType"`
+	CustomOrder   int     `json:"customOrder"`
+	Subsystem     string  `json:"subsystem"`
+	Level         string  `json:"level"`
+	Section       string  `json:"section"`
+	PassMark      float64 `json:"passMark"`
+	AcademicYear  string  `json:"academicYear"`
+	Subject       string  `json:"subject"`
+	TeacherID     string  `json:"teacherId"`
+	Year          string  `json:"year"`
 }
 
 func createClass(w http.ResponseWriter, r *http.Request) {
@@ -1172,30 +1370,66 @@ func createClass(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if req.Name == "" {
+	if req.SchoolID == "" {
+		req.SchoolID = chi.URLParam(r, "id")
+	}
+	className := strings.TrimSpace(req.FullClassName)
+	if className == "" {
+		className = strings.TrimSpace(req.Name)
+	}
+	if className == "" {
 		http.Error(w, "Class name is required", http.StatusBadRequest)
 		return
+	}
+	if len(className) > 100 {
+		http.Error(w, "Class name cannot exceed 100 characters", http.StatusBadRequest)
+		return
+	}
+	if req.Capacity <= 0 {
+		req.Capacity = 45
+	}
+	if req.ClassCode == "" {
+		req.ClassCode = generateClassCode(className)
 	}
 	if req.PassMark <= 0 { req.PassMark = 10.0 }
 	if req.AcademicYear == "" { req.AcademicYear = "2026/2027" }
 	if req.Subsystem == "" { req.Subsystem = "anglophone" }
-	
-	c := Class{
-		ID:           uuid.New().String(),
-		SchoolID:     req.SchoolID,
-		Name:         req.Name,
-		Subsystem:    req.Subsystem,
-		Level:        req.Level,
-		Section:      req.Section,
-		PassMark:     req.PassMark,
-		AcademicYear: req.AcademicYear,
-		Subject:      req.Subject,
-		TeacherID:    req.TeacherID,
-		Year:         req.Year,
-	}
+	if req.CreatedByType == "" { req.CreatedByType = "CUSTOM_MANUAL" }
+
 	if isOnline() {
-		_, err := pgDB.Exec(`INSERT INTO classes(id,school_id,name,subsystem,level,section,pass_mark,academic_year,subject,teacher_id,year) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-			c.ID, c.SchoolID, c.Name, c.Subsystem, c.Level, c.Section, c.PassMark, c.AcademicYear, c.Subject, c.TeacherID, c.Year)
+		var count int
+		pgDB.QueryRow(`SELECT COUNT(*) FROM classes WHERE school_id=$1 AND (LOWER(name)=LOWER($2) OR LOWER(full_class_name)=LOWER($2))`, req.SchoolID, className).Scan(&count)
+		if count > 0 {
+			http.Error(w, "A class with this name already exists in this school", http.StatusBadRequest)
+			return
+		}
+	}
+
+	c := Class{
+		ID:            uuid.New().String(),
+		SchoolID:      req.SchoolID,
+		Name:          className,
+		FullClassName: className,
+		ClassCode:     req.ClassCode,
+		Capacity:      req.Capacity,
+		LevelID:       req.LevelID,
+		CreatedByType: req.CreatedByType,
+		CustomOrder:   req.CustomOrder,
+		Subsystem:     req.Subsystem,
+		Level:         req.Level,
+		Section:       req.Section,
+		PassMark:      req.PassMark,
+		AcademicYear:  req.AcademicYear,
+		Subject:       req.Subject,
+		TeacherID:     req.TeacherID,
+		Year:          req.Year,
+	}
+
+	if isOnline() {
+		_, err := pgDB.Exec(`INSERT INTO classes(id,school_id,name,full_class_name,class_code,capacity,created_by_type,custom_order,subsystem,level,section,pass_mark,academic_year,subject,teacher_id,year)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+			c.ID, c.SchoolID, c.Name, c.FullClassName, c.ClassCode, c.Capacity, c.CreatedByType, c.CustomOrder,
+			c.Subsystem, c.Level, c.Section, c.PassMark, c.AcademicYear, c.Subject, c.TeacherID, c.Year)
 		if err != nil {
 			log.Printf("[Classes] Create error: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1209,6 +1443,75 @@ func createClass(w http.ResponseWriter, r *http.Request) {
 		enqueue("CREATE_CLASS", c)
 	}
 	jsonResp(w, c)
+}
+
+type UpdateClassRequest struct {
+	Name          string  `json:"name"`
+	FullClassName string  `json:"fullClassName"`
+	ClassCode     string  `json:"classCode"`
+	Capacity      int     `json:"capacity"`
+	TeacherID     string  `json:"teacherId"`
+	Subject       string  `json:"subject"`
+	Year          string  `json:"year"`
+	PassMark      float64 `json:"passMark"`
+}
+
+func updateClass(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var req UpdateClassRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	className := strings.TrimSpace(req.FullClassName)
+	if className == "" {
+		className = strings.TrimSpace(req.Name)
+	}
+	if className == "" {
+		http.Error(w, "Class name is required", http.StatusBadRequest)
+		return
+	}
+	if len(className) > 100 {
+		http.Error(w, "Class name cannot exceed 100 characters", http.StatusBadRequest)
+		return
+	}
+	if req.Capacity <= 0 {
+		req.Capacity = 45
+	}
+	if req.ClassCode == "" {
+		req.ClassCode = generateClassCode(className)
+	}
+
+	if isOnline() {
+		var count int
+		pgDB.QueryRow(`SELECT COUNT(*) FROM classes WHERE id != $1 AND school_id = (SELECT school_id FROM classes WHERE id=$1) AND (LOWER(name)=LOWER($2) OR LOWER(full_class_name)=LOWER($2))`, id, className).Scan(&count)
+		if count > 0 {
+			http.Error(w, "A class with this name already exists in this school", http.StatusBadRequest)
+			return
+		}
+
+		_, err := pgDB.Exec(`UPDATE classes SET name=$1, full_class_name=$2, class_code=$3, capacity=$4, teacher_id=$5 WHERE id=$6`,
+			className, className, req.ClassCode, req.Capacity, req.TeacherID, id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	} else {
+		localDBMu.Lock()
+		for i, c := range localDB.Classes {
+			if c.ID == id {
+				localDB.Classes[i].Name = className
+				localDB.Classes[i].FullClassName = className
+				localDB.Classes[i].ClassCode = req.ClassCode
+				localDB.Classes[i].Capacity = req.Capacity
+				localDB.Classes[i].TeacherID = req.TeacherID
+				break
+			}
+		}
+		saveLocalDB()
+		localDBMu.Unlock()
+	}
+	jsonResp(w, map[string]interface{}{"message": "Class updated successfully", "id": id, "name": className, "fullClassName": className, "classCode": req.ClassCode, "capacity": req.Capacity})
 }
 
 func updateClassPassMark(w http.ResponseWriter, r *http.Request) {
@@ -1323,6 +1626,20 @@ func saveCourseSubject(w http.ResponseWriter, r *http.Request) {
 func deleteClass(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if isOnline() {
+		var studentCount int
+		pgDB.QueryRow(`SELECT COUNT(*) FROM enrollments WHERE class_id=$1`, id).Scan(&studentCount)
+		if studentCount > 0 {
+			http.Error(w, fmt.Sprintf("Cannot delete class: %d student(s) are currently enrolled in it. Please unenroll or transfer them first.", studentCount), http.StatusBadRequest)
+			return
+		}
+
+		var courseCount int
+		pgDB.QueryRow(`SELECT COUNT(*) FROM course_subjects WHERE class_id=$1`, id).Scan(&courseCount)
+		if courseCount > 0 {
+			http.Error(w, fmt.Sprintf("Cannot delete class: %d course subject(s) are assigned to it. Please remove subjects first.", courseCount), http.StatusBadRequest)
+			return
+		}
+
 		pgDB.Exec(`DELETE FROM classes WHERE id=$1`, id)
 	} else {
 		localDBMu.Lock()

@@ -185,7 +185,7 @@ export default function AdminReportCardGenerator({ config, accent }) {
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Class</label>
             <select value={classId} onChange={e => setClassId(e.target.value)} style={{ ...inputStyle, background: '#fff', minWidth: 220 }}>
               <option value="">-- Choose Class --</option>
-              {classes.map(c => <option key={c.ID || c.id} value={c.ID || c.id}>{c.name}</option>)}
+              {classes.map(c => <option key={c.ID || c.id} value={c.ID || c.id}>{c.fullClassName || c.name}</option>)}
             </select>
           </div>
 

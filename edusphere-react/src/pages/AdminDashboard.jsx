@@ -5,7 +5,8 @@ import {
   LogOut, Building2, CheckCircle2, AlertCircle, Loader2,
   Palette, Trash2, Plus, BookOpen, Shield, ToggleLeft,
   ToggleRight, X, School, FileSpreadsheet, Upload, Download, FileText,
-  Menu, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen
+  Menu, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
+  Edit2, Check, Sparkles, Hash, Layers
 } from 'lucide-react';
 import { T, rgba, navItemStyle, cardStyle, inputStyle, btnStyle, badge } from '../styles/portalTheme';
 import ReportCardControls from '../components/ReportCardControls';
@@ -29,14 +30,21 @@ export default function AdminDashboard() {
   const [sequences, setSequences] = useState([]);
   const [showAddUser, setShowAddUser] = useState(false);
   const [showAddClass, setShowAddClass] = useState(false);
+  const [editingClass, setEditingClass] = useState(null);
   const [showAddSequence, setShowAddSequence] = useState(false);
   const [newSequenceName, setNewSequenceName] = useState('');
   const [newUserName, setNewUserName] = useState('');
   const [newUserRole, setNewUserRole] = useState('Teacher');
   const [newClassName, setNewClassName] = useState('');
+  const [newClassCode, setNewClassCode] = useState('');
+  const [newClassCapacity, setNewClassCapacity] = useState(45);
   const [newClassSubject, setNewClassSubject] = useState('');
   const [newClassYear, setNewClassYear] = useState('');
   const [newClassTeacher, setNewClassTeacher] = useState('');
+  const [editClassName, setEditClassName] = useState('');
+  const [editClassCode, setEditClassCode] = useState('');
+  const [editClassCapacity, setEditClassCapacity] = useState(45);
+  const [editClassTeacher, setEditClassTeacher] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formSuccess, setFormSuccess] = useState(null);
   const [formError, setFormError] = useState(null);
@@ -172,16 +180,91 @@ export default function AdminDashboard() {
     e.preventDefault(); setIsSubmitting(true); setFormError(null);
     try {
       const teacher = teachers.find(t => t.name === newClassTeacher);
-      const res = await fetch(`${API}/api/classes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schoolId: config.schoolId, name: newClassName, subject: newClassSubject, year: newClassYear, teacherId: teacher ? teacher.id : 0 }) });
-      if (!res.ok) throw new Error('Failed');
-      setNewClassName(''); setNewClassSubject(''); setNewClassYear(''); setNewClassTeacher(''); setShowAddClass(false);
+      const payload = {
+        schoolId: config.schoolId,
+        fullClassName: newClassName.trim(),
+        name: newClassName.trim(),
+        classCode: newClassCode.trim(),
+        capacity: parseInt(newClassCapacity, 10) || 45,
+        teacherId: teacher ? teacher.id : ''
+      };
+      const res = await fetch(`${API}/api/classes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const errTxt = await res.text();
+        throw new Error(errTxt || 'Failed to create class');
+      }
+      setNewClassName('');
+      setNewClassCode('');
+      setNewClassCapacity(45);
+      setNewClassTeacher('');
+      setShowAddClass(false);
       fetchClasses();
-    } catch (err) { setFormError(err.message); } finally { setIsSubmitting(false); }
+    } catch (err) {
+      setFormError(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDeleteClass = async (id) => {
-    if (!window.confirm('Delete this class?')) return;
-    await fetch(`${API}/api/classes/${id}`, { method: 'DELETE' }); fetchClasses();
+  const startEditClass = (cls) => {
+    setEditingClass(cls);
+    setEditClassName(cls.fullClassName || cls.name || '');
+    setEditClassCode(cls.classCode || '');
+    setEditClassCapacity(cls.capacity || 45);
+    const teacher = teachers.find(t => t.id === cls.teacherId);
+    setEditClassTeacher(teacher ? teacher.name : '');
+    setFormError(null);
+  };
+
+  const handleUpdateClass = async (e) => {
+    e.preventDefault();
+    if (!editingClass) return;
+    setIsSubmitting(true); setFormError(null);
+    try {
+      const teacher = teachers.find(t => t.name === editClassTeacher);
+      const classId = editingClass.id || editingClass.ID;
+      const payload = {
+        fullClassName: editClassName.trim(),
+        name: editClassName.trim(),
+        classCode: editClassCode.trim(),
+        capacity: parseInt(editClassCapacity, 10) || 45,
+        teacherId: teacher ? teacher.id : (editClassTeacher ? editingClass.teacherId : '')
+      };
+      const res = await fetch(`${API}/api/classes/${classId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const errTxt = await res.text();
+        throw new Error(errTxt || 'Failed to update class');
+      }
+      setEditingClass(null);
+      fetchClasses();
+    } catch (err) {
+      setFormError(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteClass = async (id, className) => {
+    if (!window.confirm(`Are you sure you want to delete class "${className || 'this class'}"?`)) return;
+    try {
+      const res = await fetch(`${API}/api/classes/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const errTxt = await res.text();
+        alert(`Cannot delete class: ${errTxt}`);
+        return;
+      }
+      fetchClasses();
+    } catch (err) {
+      alert('Delete failed: ' + err.message);
+    }
   };
 
   const handleSaveSettings = async () => {
@@ -377,141 +460,333 @@ export default function AdminDashboard() {
     </div>
   );
 
-  const renderClasses = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Curriculum</p>
-          <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Manage Classes</h1>
-        </div>
-        <button onClick={() => { setShowAddClass(true); setFormError(null); }} style={btnStyle(accent)}><Plus size={15} /> New Class</button>
-      </div>
-      {showAddClass && (
-        <div style={{ ...cardStyle, border: `1.5px solid ${rgba(accent, 0.3)}` }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
-            <h4 style={{ fontFamily: T.fontSans, fontWeight: 700, color: T.text, margin: 0 }}>Create Class</h4>
-            <button onClick={() => setShowAddClass(false)} style={{ background: 'none', border: 'none', color: T.muted, cursor: 'pointer' }}><X size={18} /></button>
-          </div>
-          <form onSubmit={handleCreateClass}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 14 }}>
-              {[{ label: 'Class Name', val: newClassName, set: setNewClassName, ph: 'e.g. JSS 1A' }, { label: 'Subject', val: newClassSubject, set: setNewClassSubject, ph: 'e.g. Mathematics' }, { label: 'Year / Level', val: newClassYear, set: setNewClassYear, ph: 'e.g. Year 7' }].map(f => (
-                <div key={f.label}><label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>{f.label}</label><input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph} style={inputStyle} /></div>
-              ))}
-              <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Assign Teacher</label>
-                <select value={newClassTeacher} onChange={e => setNewClassTeacher(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
-                  <option value="">-- Select --</option>
-                  {teachers.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-                </select>
-              </div>
+  const renderClasses = () => {
+    const isCustom = config.classNamingType === 'CUSTOM';
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+              <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: 0 }}>Curriculum & Structure</p>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: isCustom ? '#fef3c7' : '#dcfce7', color: isCustom ? '#b45309' : '#15803d' }}>
+                {isCustom ? 'Custom Naming Mode' : 'Standard Naming Mode'}
+              </span>
             </div>
-            {formError && <p style={{ color: '#ef4444', fontSize: 13, marginBottom: 10 }}>{formError}</p>}
-            <button type="submit" disabled={isSubmitting} style={btnStyle(accent)}>{isSubmitting ? <Loader2 size={14} /> : <><Plus size={14} />Create Class</>}</button>
-          </form>
+            <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>
+              Manage Classes <span style={{ color: T.muted, fontStyle: 'normal', fontFamily: T.fontSans, fontSize: 18 }}>({classes.length})</span>
+            </h1>
+          </div>
+          <button onClick={() => { setShowAddClass(true); setEditingClass(null); setFormError(null); }} style={btnStyle(accent)}>
+            <Plus size={15} /> + Add Class
+          </button>
         </div>
-      )}
-      {classes.length === 0 ? (
-        <div style={{ ...cardStyle, textAlign: 'center', padding: '60px 24px', color: T.muted }}>
-          <BookOpen size={40} style={{ marginBottom: 12, opacity: 0.3 }} /><p>No classes yet. Create your first class above!</p>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-          {classes.map(cls => {
-            const teacher = teachers.find(t => t.id === cls.teacherId);
-            return (
-              <div key={cls.ID} style={{ ...cardStyle, borderTop: `3px solid ${accent}`, position: 'relative' }}>
-                <button onClick={() => handleDeleteClass(cls.ID)} style={{ position: 'absolute', top: 14, right: 14, background: '#fef2f2', border: 'none', borderRadius: 6, color: '#ef4444', cursor: 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center' }}><Trash2 size={13} /></button>
-                <h3 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 20, margin: '0 0 4px', color: T.text }}>{cls.name}</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-                  {cls.year && <div style={{ display: 'flex', justifyContent: 'space-between', color: T.muted, fontSize: 13 }}><span>Year</span><strong style={{ color: T.text }}>{cls.year}</strong></div>}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: T.muted, fontSize: 13 }}><span>Teacher</span><strong style={{ color: T.text }}>{teacher ? teacher.name : '—'}</strong></div>
+
+        {/* CREATE CLASS FORM */}
+        {showAddClass && (
+          <div style={{ ...cardStyle, border: `1.5px solid ${rgba(accent, 0.3)}`, animation: 'fadeIn 0.2s ease-in-out' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
+              <div>
+                <h4 style={{ fontFamily: T.fontSans, fontWeight: 700, color: T.text, margin: 0, fontSize: 16 }}>Create New Class</h4>
+                <p style={{ margin: '2px 0 0', fontSize: 13, color: T.muted }}>
+                  {isCustom ? 'Add your custom school class name, code, and capacity.' : 'Add a standard or custom parallel stream.'}
+                </p>
+              </div>
+              <button onClick={() => setShowAddClass(false)} style={{ background: 'none', border: 'none', color: T.muted, cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleCreateClass}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 14 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Class Name *</label>
+                  <input
+                    required
+                    value={newClassName}
+                    onChange={e => setNewClassName(e.target.value)}
+                    placeholder="e.g. Form 1 - Science, Class 4 Advanced"
+                    style={inputStyle}
+                  />
                 </div>
-                <button
-                  onClick={async () => {
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Class Code (Optional)</label>
+                  <input
+                    value={newClassCode}
+                    onChange={e => setNewClassCode(e.target.value)}
+                    placeholder="e.g. SS1S, F1-ADV (Auto if blank)"
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Capacity</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="500"
+                    value={newClassCapacity}
+                    onChange={e => setNewClassCapacity(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Assign Teacher (Optional)</label>
+                  <select value={newClassTeacher} onChange={e => setNewClassTeacher(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
+                    <option value="">-- No Teacher Assigned --</option>
+                    {teachers.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              {formError && <p style={{ color: '#ef4444', fontSize: 13, marginBottom: 12 }}>⚠️ {formError}</p>}
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button type="submit" disabled={isSubmitting} style={btnStyle(accent)}>
+                  {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <><Plus size={14} />Save Class</>}
+                </button>
+                <button type="button" onClick={() => setShowAddClass(false)} style={btnStyle('#64748b', true)}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* EDIT CLASS MODAL */}
+        {editingClass && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+            <div style={{ ...cardStyle, width: '100%', maxWidth: 500, padding: 28, position: 'relative' }}>
+              <button onClick={() => setEditingClass(null)} style={{ position: 'absolute', top: 20, right: 20, background: 'none', border: 'none', cursor: 'pointer', color: T.muted }}><X size={20} /></button>
+              <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 4px', fontSize: 24, color: T.text }}>Edit Class</h2>
+              <p style={{ color: T.muted, fontSize: 13, margin: '0 0 20px' }}>Update class details and settings</p>
+
+              <form onSubmit={handleUpdateClass}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Class Name *</label>
+                    <input
+                      required
+                      value={editClassName}
+                      onChange={e => setEditClassName(e.target.value)}
+                      placeholder="e.g. Form 1 - Science"
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Class Code</label>
+                      <input
+                        value={editClassCode}
+                        onChange={e => setEditClassCode(e.target.value)}
+                        placeholder="e.g. SS1S"
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Capacity</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="500"
+                        value={editClassCapacity}
+                        onChange={e => setEditClassCapacity(e.target.value)}
+                        style={inputStyle}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Assign Teacher</label>
+                    <select value={editClassTeacher} onChange={e => setEditClassTeacher(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
+                      <option value="">-- No Teacher Assigned --</option>
+                      {teachers.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                {formError && <p style={{ color: '#ef4444', fontSize: 13, marginBottom: 12 }}>⚠️ {formError}</p>}
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={() => setEditingClass(null)} style={btnStyle('#64748b', true)}>Cancel</button>
+                  <button type="submit" disabled={isSubmitting} style={btnStyle(accent)}>
+                    {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* CLASSES TABLE */}
+        {classes.length === 0 ? (
+          <div style={{ ...cardStyle, textAlign: 'center', padding: '60px 24px', color: T.muted }}>
+            <BookOpen size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
+            <h3 style={{ margin: '0 0 6px', color: T.text, fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 20 }}>No classes created yet</h3>
+            <p style={{ margin: '0 0 16px', fontSize: 14 }}>
+              {isCustom ? 'Add your custom school classes using the "+ Add Class" button above.' : 'Create your first class to start organizing students and curriculum.'}
+            </p>
+            <button onClick={() => setShowAddClass(true)} style={btnStyle(accent)}><Plus size={14} /> Create First Class</button>
+          </div>
+        ) : (
+          <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: T.fontSans, minWidth: 640 }}>
+                <thead>
+                  <tr style={{ background: '#faf9f7', borderBottom: `1px solid ${T.border}` }}>
+                    <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Class Name</th>
+                    <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Code</th>
+                    <th style={{ padding: '14px 16px', textAlign: 'center', fontSize: 12, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Capacity</th>
+                    <th style={{ padding: '14px 16px', textAlign: 'center', fontSize: 12, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Enrolled</th>
+                    <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Teacher</th>
+                    <th style={{ padding: '14px 20px', textAlign: 'right', fontSize: 12, fontWeight: 600, color: T.light, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {classes.map(cls => {
                     const classId = cls.id || cls.ID;
-                    setRosterClass(cls);
-                    setRosterLoading(true);
-                    try {
+                    const displayName = cls.fullClassName || cls.name || 'Unnamed Class';
+                    const teacher = teachers.find(t => t.id === cls.teacherId);
+                    const enrolledCount = cls.studentCount !== undefined ? cls.studentCount : 0;
+                    const cap = cls.capacity || 45;
+                    const isFull = enrolledCount >= cap;
+
+                    return (
+                      <tr key={classId} style={{ borderBottom: `1px solid ${T.borderLight}`, transition: 'background 0.15s' }}>
+                        <td style={{ padding: '16px 20px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ width: 34, height: 34, borderRadius: 8, background: rgba(accent, 0.1), display: 'flex', alignItems: 'center', justifyContent: 'center', color: accent, flexShrink: 0 }}>
+                              <BookOpen size={17} />
+                            </div>
+                            <div>
+                              <strong style={{ color: T.text, fontSize: 15, display: 'block' }}>{displayName}</strong>
+                              <span style={{ fontSize: 12, color: T.muted }}>
+                                {cls.createdByType === 'CUSTOM_MANUAL' ? 'Custom' : 'Standard'}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '16px 16px' }}>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: 13, background: '#f1f5f9', padding: '3px 8px', borderRadius: 6, color: '#334155' }}>
+                            {cls.classCode || '—'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '16px 16px', textAlign: 'center', fontSize: 14, color: T.text, fontWeight: 500 }}>
+                          {cap}
+                        </td>
+                        <td style={{ padding: '16px 16px', textAlign: 'center' }}>
+                          <span style={{
+                            padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600,
+                            background: isFull ? '#fee2e2' : (enrolledCount > 0 ? '#dcfce7' : '#f1f5f9'),
+                            color: isFull ? '#dc2626' : (enrolledCount > 0 ? '#15803d' : '#64748b')
+                          }}>
+                            {enrolledCount} / {cap}
+                          </span>
+                        </td>
+                        <td style={{ padding: '16px 20px', fontSize: 14, color: teacher ? T.text : T.muted }}>
+                          {teacher ? teacher.name : '—'}
+                        </td>
+                        <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+                            <button
+                              title="Manage Roster"
+                              onClick={async () => {
+                                setRosterClass(cls);
+                                setRosterLoading(true);
+                                try {
+                                  const res = await fetch(`${API}/api/enrollments?classId=${classId}&schoolId=${config.schoolId}`);
+                                  setRosterEnrollments(await res.json() || []);
+                                } catch { setRosterEnrollments([]); }
+                                finally { setRosterLoading(false); }
+                              }}
+                              style={{ ...btnStyle(accent, true), padding: '6px 10px', fontSize: 12 }}
+                            >
+                              <Users size={13} /> Roster
+                            </button>
+                            <button
+                              title="Edit Class"
+                              onClick={() => startEditClass(cls)}
+                              style={{ ...btnStyle('#475569', true), padding: '6px 8px', fontSize: 12 }}
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                            <button
+                              title="Delete Class"
+                              onClick={() => handleDeleteClass(classId, displayName)}
+                              style={{ background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: 6, color: '#ef4444', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center' }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ROSTER MODAL */}
+        {rosterClass && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+            <div style={{ ...cardStyle, width: '100%', maxWidth: 540, padding: 28, position: 'relative', maxHeight: '85vh', overflowY: 'auto' }}>
+              <button onClick={() => setRosterClass(null)} style={{ position: 'absolute', top: 20, right: 20, background: 'none', border: 'none', cursor: 'pointer', color: T.muted }}><X size={20} /></button>
+              <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 4px', fontSize: 24, color: T.text }}>Class Roster: {rosterClass.fullClassName || rosterClass.name}</h2>
+              <p style={{ color: accent, fontSize: 13, fontWeight: 600, margin: '0 0 20px' }}>{rosterClass.classCode ? `Code: ${rosterClass.classCode}` : ''} ({rosterClass.year || 'Standard level'})</p>
+
+              <div style={{ marginBottom: 20, background: '#faf9f7', padding: 14, borderRadius: 8, border: `1px solid ${T.border}` }}>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: T.text, marginBottom: 6 }}>Add Student to Class</label>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <select value={rosterStudentId} onChange={e => setRosterStudentId(e.target.value)} style={{ ...inputStyle, flex: 1, background: '#fff' }}>
+                    <option value="">-- Choose Student --</option>
+                    {students.filter(s => !rosterEnrollments.some(re => re.studentId === s.id)).map(s => (
+                      <option key={s.id} value={s.id}>{s.name} ({s.email})</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={async () => {
+                      if (!rosterStudentId) return;
+                      const classId = rosterClass.id || rosterClass.ID;
+                      await fetch(`${API}/api/enrollments`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ schoolId: config.schoolId, classId, studentId: rosterStudentId })
+                      });
+                      setRosterStudentId('');
                       const res = await fetch(`${API}/api/enrollments?classId=${classId}&schoolId=${config.schoolId}`);
                       setRosterEnrollments(await res.json() || []);
-                    } catch { setRosterEnrollments([]); }
-                    finally { setRosterLoading(false); }
-                  }}
-                  style={{ ...btnStyle(accent, true), width: '100%', justifyContent: 'center', fontSize: 12, padding: '8px' }}
-                >
-                  <Users size={14} /> Manage Students / Roster
-                </button>
+                      fetchClasses();
+                    }}
+                    style={btnStyle(accent)}
+                  >
+                    <Plus size={14} /> Add
+                  </button>
+                </div>
               </div>
-            );
-          })}
-        </div>
-      )}
 
-      {/* ROSTER MODAL */}
-      {rosterClass && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div style={{ ...cardStyle, width: '100%', maxWidth: 540, padding: 28, position: 'relative', maxHeight: '85vh', overflowY: 'auto' }}>
-            <button onClick={() => setRosterClass(null)} style={{ position: 'absolute', top: 20, right: 20, background: 'none', border: 'none', cursor: 'pointer', color: T.muted }}><X size={20} /></button>
-            <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', margin: '0 0 4px', fontSize: 24, color: T.text }}>Class Roster: {rosterClass.name}</h2>
-            <p style={{ color: accent, fontSize: 13, fontWeight: 600, margin: '0 0 20px' }}>{rosterClass.subject} ({rosterClass.year || 'No level'})</p>
-
-            <div style={{ marginBottom: 20, background: '#faf9f7', padding: 14, borderRadius: 8, border: `1px solid ${T.border}` }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: T.text, marginBottom: 6 }}>Add Student to Class</label>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <select value={rosterStudentId} onChange={e => setRosterStudentId(e.target.value)} style={{ ...inputStyle, flex: 1, background: '#fff' }}>
-                  <option value="">-- Choose Student --</option>
-                  {students.filter(s => !rosterEnrollments.some(re => re.studentId === s.id)).map(s => (
-                    <option key={s.id} value={s.id}>{s.name} ({s.email})</option>
+              <h4 style={{ fontFamily: T.fontSans, fontWeight: 700, fontSize: 14, color: T.text, margin: '0 0 10px' }}>Enrolled Students ({rosterEnrollments.length})</h4>
+              {rosterLoading ? <p style={{ fontSize: 13, color: T.muted }}>Loading roster...</p> : rosterEnrollments.length === 0 ? (
+                <p style={{ fontSize: 13, color: T.muted, fontStyle: 'italic' }}>No students enrolled in this class yet.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {rosterEnrollments.map(e => (
+                    <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: 8, background: '#fff', border: `1px solid ${T.borderLight}` }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{e.studentName}</span>
+                      <button
+                        onClick={async () => {
+                          const classId = rosterClass.id || rosterClass.ID;
+                          await fetch(`${API}/api/enrollments?classId=${classId}&studentId=${e.studentId}`, { method: 'DELETE' });
+                          const res = await fetch(`${API}/api/enrollments?classId=${classId}&schoolId=${config.schoolId}`);
+                          setRosterEnrollments(await res.json() || []);
+                          fetchClasses();
+                        }}
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
+                      >
+                        <Trash2 size={13} /> Remove
+                      </button>
+                    </div>
                   ))}
-                </select>
-                <button
-                  onClick={async () => {
-                    if (!rosterStudentId) return;
-                    const classId = rosterClass.id || rosterClass.ID;
-                    await fetch(`${API}/api/enrollments`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ schoolId: config.schoolId, classId, studentId: rosterStudentId })
-                    });
-                    setRosterStudentId('');
-                    const res = await fetch(`${API}/api/enrollments?classId=${classId}&schoolId=${config.schoolId}`);
-                    setRosterEnrollments(await res.json() || []);
-                  }}
-                  style={btnStyle(accent)}
-                >
-                  <Plus size={14} /> Add
-                </button>
-              </div>
+                </div>
+              )}
             </div>
-
-            <h4 style={{ fontFamily: T.fontSans, fontWeight: 700, fontSize: 14, color: T.text, margin: '0 0 10px' }}>Enrolled Students ({rosterEnrollments.length})</h4>
-            {rosterLoading ? <p style={{ fontSize: 13, color: T.muted }}>Loading roster...</p> : rosterEnrollments.length === 0 ? (
-              <p style={{ fontSize: 13, color: T.muted, fontStyle: 'italic' }}>No students enrolled in this class yet.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {rosterEnrollments.map(e => (
-                  <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: 8, background: '#fff', border: `1px solid ${T.borderLight}` }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{e.studentName}</span>
-                    <button
-                      onClick={async () => {
-                        const classId = rosterClass.id || rosterClass.ID;
-                        await fetch(`${API}/api/enrollments?classId=${classId}&studentId=${e.studentId}`, { method: 'DELETE' });
-                        const res = await fetch(`${API}/api/enrollments?classId=${classId}&schoolId=${config.schoolId}`);
-                        setRosterEnrollments(await res.json() || []);
-                      }}
-                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
-                    >
-                      <Trash2 size={13} /> Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
-        </div>
-      )}
-    </div>
-  );
+        )}
+      </div>
+    );
+  };
   
   const handleCreateSequence = async (e) => {
     e.preventDefault(); setIsSubmitting(true); setFormError(null);
@@ -780,7 +1055,7 @@ export default function AdminDashboard() {
               <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Select Class</label>
               <select value={enrollClassId} onChange={e => { setEnrollClassId(e.target.value); setTimeout(() => {}, 0); }} style={{ ...inputStyle, background: '#fff' }}>
                 <option value="">-- Choose Class --</option>
-                {classes.map(c => <option key={c.ID || c.id} value={c.ID || c.id}>{c.name} ({c.subject})</option>)}
+                {classes.map(c => <option key={c.ID || c.id} value={c.ID || c.id}>{c.fullClassName || c.name}</option>)}
               </select>
             </div>
             <div>
@@ -799,7 +1074,7 @@ export default function AdminDashboard() {
             <p style={{ fontWeight: 600, color: T.text, margin: 0 }}>Current Enrollments</p>
             <select value={enrollClassId} onChange={e => { setEnrollClassId(e.target.value); fetchClassEnrollments(e.target.value); }} style={{ ...inputStyle, background: '#fff', maxWidth: 220 }}>
               <option value="">-- Select class to view --</option>
-              {classes.map(c => <option key={c.ID || c.id} value={c.ID || c.id}>{c.name}</option>)}
+              {classes.map(c => <option key={c.ID || c.id} value={c.ID || c.id}>{c.fullClassName || c.name}</option>)}
             </select>
           </div>
           {enrollments.length === 0 ? (
