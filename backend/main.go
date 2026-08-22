@@ -411,6 +411,8 @@ type LocalDB struct {
 	Sequences     []Sequence           `json:"sequences"`
 	Marks         []Mark               `json:"marks"`
 	Templates     []ReportCardTemplate `json:"templates"`
+	Enrollments   []Enrollment         `json:"enrollments"`
+	Attendance    []AttendanceRecord   `json:"attendance"`
 }
 
 var (
@@ -1175,17 +1177,21 @@ type SafeUser struct {
 }
 
 func listUsers(w http.ResponseWriter, r *http.Request) {
-	schoolID := r.URL.Query().Get("schoolId")
+	schoolID := strings.TrimSpace(r.URL.Query().Get("schoolId"))
+	if schoolID == "undefined" || schoolID == "null" {
+		schoolID = ""
+	}
+	if schoolID == "" {
+		jsonResp(w, []SafeUser{})
+		return
+	}
 	roleFilter := r.URL.Query().Get("role")
 	var list []SafeUser
 
 	if isOnline() {
-		q := `SELECT id,name,email,role,first_login FROM users WHERE 1=1`
-		args := []interface{}{}
-		n := 1
-		if schoolID != "" {
-			q += fmt.Sprintf(" AND school_id=$%d", n); args = append(args, schoolID); n++
-		}
+		q := `SELECT id,name,email,role,first_login FROM users WHERE school_id=$1`
+		args := []interface{}{schoolID}
+		n := 2
 		if roleFilter != "" {
 			q += fmt.Sprintf(" AND LOWER(role)=LOWER($%d)", n); args = append(args, roleFilter); n++
 		}
@@ -1210,7 +1216,7 @@ func listUsers(w http.ResponseWriter, r *http.Request) {
 		localDBMu.RLock()
 		defer localDBMu.RUnlock()
 		for _, u := range localDB.Users {
-			if schoolID != "" && u.SchoolID != schoolID { continue }
+			if u.SchoolID != schoolID { continue }
 			if roleFilter != "" && !strings.EqualFold(u.Role, roleFilter) { continue }
 			list = append(list, SafeUser{u.ID, u.Name, u.Email, u.Role, u.FirstLogin})
 		}
@@ -1306,20 +1312,26 @@ func deleteUser(w http.ResponseWriter, r *http.Request) {
 // =====================================================================
 
 func listClasses(w http.ResponseWriter, r *http.Request) {
-	schoolID := r.URL.Query().Get("schoolId")
+	schoolID := strings.TrimSpace(r.URL.Query().Get("schoolId"))
 	if schoolID == "" {
-		schoolID = chi.URLParam(r, "id")
+		schoolID = strings.TrimSpace(chi.URLParam(r, "id"))
+	}
+	if schoolID == "undefined" || schoolID == "null" {
+		schoolID = ""
+	}
+	if schoolID == "" {
+		// Strict multi-tenant isolation: never return classes if no schoolId is provided
+		jsonResp(w, []Class{})
+		return
 	}
 	academicYear := r.URL.Query().Get("academicYear")
-	if schoolID == "undefined" || schoolID == "null" { schoolID = "" }
 	var list []Class
 	if isOnline() {
 		q := `SELECT c.id, c.school_id, c.name, COALESCE(NULLIF(c.full_class_name, ''), c.name), COALESCE(c.class_code,''), COALESCE(c.capacity, 45), COALESCE(c.created_by_type, 'STANDARD_AUTO'), COALESCE(c.custom_order, 0), COALESCE(c.subsystem,'anglophone'), COALESCE(c.level,''), COALESCE(c.section,''), COALESCE(c.pass_mark, 10.0), COALESCE(c.academic_year,'2026/2027'), COALESCE(c.subject,''), COALESCE(c.teacher_id,''), COALESCE(c.year,''),
 			(SELECT COUNT(*) FROM enrollments WHERE class_id = c.id) AS student_count
-			FROM classes c WHERE 1=1`
-		args := []interface{}{}
-		n := 1
-		if schoolID != "" { q += fmt.Sprintf(" AND c.school_id=$%d", n); args = append(args, schoolID); n++ }
+			FROM classes c WHERE c.school_id=$1`
+		args := []interface{}{schoolID}
+		n := 2
 		if academicYear != "" { q += fmt.Sprintf(" AND c.academic_year=$%d", n); args = append(args, academicYear); n++ }
 		q += " ORDER BY c.custom_order ASC, c.level ASC, c.name ASC"
 		rows, err := pgDB.Query(q, args...)
@@ -1338,7 +1350,7 @@ func listClasses(w http.ResponseWriter, r *http.Request) {
 		localDBMu.RLock()
 		defer localDBMu.RUnlock()
 		for _, c := range localDB.Classes {
-			if schoolID != "" && c.SchoolID != schoolID { continue }
+			if c.SchoolID != schoolID { continue }
 			if academicYear != "" && c.AcademicYear != "" && c.AcademicYear != academicYear { continue }
 			if c.FullClassName != "" {
 				c.Name = c.FullClassName
@@ -1375,8 +1387,13 @@ func createClass(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	req.SchoolID = strings.TrimSpace(req.SchoolID)
 	if req.SchoolID == "" {
-		req.SchoolID = chi.URLParam(r, "id")
+		req.SchoolID = strings.TrimSpace(chi.URLParam(r, "id"))
+	}
+	if req.SchoolID == "" || req.SchoolID == "undefined" || req.SchoolID == "null" {
+		http.Error(w, "schoolId is required to create a class", http.StatusBadRequest)
+		return
 	}
 	className := strings.TrimSpace(req.FullClassName)
 	if className == "" {
@@ -1588,8 +1605,14 @@ func rolloverClasses(w http.ResponseWriter, r *http.Request) {
 }
 
 func listCourseSubjects(w http.ResponseWriter, r *http.Request) {
-	classID := r.URL.Query().Get("classId")
-	schoolID := r.URL.Query().Get("schoolId")
+	classID := strings.TrimSpace(r.URL.Query().Get("classId"))
+	schoolID := strings.TrimSpace(r.URL.Query().Get("schoolId"))
+	if schoolID == "undefined" || schoolID == "null" { schoolID = "" }
+	if classID == "undefined" || classID == "null" { classID = "" }
+	if schoolID == "" && classID == "" {
+		jsonResp(w, []CourseSubject{})
+		return
+	}
 	var list []CourseSubject
 	if isOnline() {
 		q := `SELECT id, school_id, class_id, name, coefficient, COALESCE(teacher_id,'') FROM course_subjects WHERE 1=1`
@@ -1605,6 +1628,14 @@ func listCourseSubjects(w http.ResponseWriter, r *http.Request) {
 				rows.Scan(&s.ID, &s.SchoolID, &s.ClassID, &s.Name, &s.Coefficient, &s.TeacherID)
 				list = append(list, s)
 			}
+		}
+	} else {
+		localDBMu.RLock()
+		defer localDBMu.RUnlock()
+		for _, s := range localDB.Subjects {
+			if classID != "" && s.ClassID != classID { continue }
+			if schoolID != "" && s.SchoolID != schoolID { continue }
+			list = append(list, s)
 		}
 	}
 	if list == nil { list = []CourseSubject{} }
@@ -1874,9 +1905,16 @@ func upsertMark(w http.ResponseWriter, r *http.Request) {
 }
 
 func listMarks(w http.ResponseWriter, r *http.Request) {
-	schoolID := r.URL.Query().Get("schoolId")
-	classID := r.URL.Query().Get("classId")
-	sequenceID := r.URL.Query().Get("sequenceId")
+	schoolID := strings.TrimSpace(r.URL.Query().Get("schoolId"))
+	classID := strings.TrimSpace(r.URL.Query().Get("classId"))
+	sequenceID := strings.TrimSpace(r.URL.Query().Get("sequenceId"))
+	if schoolID == "undefined" || schoolID == "null" { schoolID = "" }
+	if classID == "undefined" || classID == "null" { classID = "" }
+	if sequenceID == "undefined" || sequenceID == "null" { sequenceID = "" }
+	if schoolID == "" && classID == "" {
+		jsonResp(w, []interface{}{})
+		return
+	}
 	type MarkWithName struct {
 		Mark
 		StudentName string `json:"studentName"`
@@ -1968,9 +2006,16 @@ type Enrollment struct {
 }
 
 func listEnrollments(w http.ResponseWriter, r *http.Request) {
-	schoolID := r.URL.Query().Get("schoolId")
-	classID := r.URL.Query().Get("classId")
-	studentID := r.URL.Query().Get("studentId")
+	schoolID := strings.TrimSpace(r.URL.Query().Get("schoolId"))
+	classID := strings.TrimSpace(r.URL.Query().Get("classId"))
+	studentID := strings.TrimSpace(r.URL.Query().Get("studentId"))
+	if schoolID == "undefined" || schoolID == "null" { schoolID = "" }
+	if classID == "undefined" || classID == "null" { classID = "" }
+	if studentID == "undefined" || studentID == "null" { studentID = "" }
+	if schoolID == "" && classID == "" && studentID == "" {
+		jsonResp(w, []Enrollment{})
+		return
+	}
 	var list []Enrollment
 	if isOnline() {
 		q := `SELECT e.id, e.school_id, e.student_id, COALESCE(u.name,''), e.class_id, COALESCE(c.name,'')
@@ -1986,6 +2031,26 @@ func listEnrollments(w http.ResponseWriter, r *http.Request) {
 			var e Enrollment
 			rows.Scan(&e.ID, &e.SchoolID, &e.StudentID, &e.StudentName, &e.ClassID, &e.ClassName)
 			list = append(list, e)
+		}
+	} else {
+		localDBMu.RLock()
+		defer localDBMu.RUnlock()
+		nameMap := map[string]string{}
+		for _, u := range localDB.Users { nameMap[u.ID] = u.Name }
+		classMap := map[string]string{}
+		for _, c := range localDB.Classes { classMap[c.ID] = c.Name }
+		for _, en := range localDB.Enrollments {
+			if schoolID != "" && en.SchoolID != schoolID { continue }
+			if classID != "" && en.ClassID != classID { continue }
+			if studentID != "" && en.StudentID != studentID { continue }
+			list = append(list, Enrollment{
+				ID:          en.ID,
+				SchoolID:    en.SchoolID,
+				StudentID:   en.StudentID,
+				StudentName: nameMap[en.StudentID],
+				ClassID:     en.ClassID,
+				ClassName:   classMap[en.ClassID],
+			})
 		}
 	}
 	if list == nil { list = []Enrollment{} }
@@ -2829,10 +2894,17 @@ type AttendanceRecord struct {
 }
 
 func listAttendance(w http.ResponseWriter, r *http.Request) {
-	schoolID := r.URL.Query().Get("schoolId")
-	classID := r.URL.Query().Get("classId")
-	studentID := r.URL.Query().Get("studentId")
-	date := r.URL.Query().Get("date")
+	schoolID := strings.TrimSpace(r.URL.Query().Get("schoolId"))
+	classID := strings.TrimSpace(r.URL.Query().Get("classId"))
+	studentID := strings.TrimSpace(r.URL.Query().Get("studentId"))
+	date := strings.TrimSpace(r.URL.Query().Get("date"))
+	if schoolID == "undefined" || schoolID == "null" { schoolID = "" }
+	if classID == "undefined" || classID == "null" { classID = "" }
+	if studentID == "undefined" || studentID == "null" { studentID = "" }
+	if schoolID == "" && classID == "" && studentID == "" {
+		jsonResp(w, []AttendanceRecord{})
+		return
+	}
 	var list []AttendanceRecord
 	if isOnline() {
 		q := `SELECT id,school_id,COALESCE(class_id,''),student_id,date::text,status,COALESCE(teacher_id,'') FROM attendance WHERE 1=1`
