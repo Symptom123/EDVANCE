@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -671,6 +672,7 @@ func main() {
 	loadLocalDB()
 	loadSyncQueue()
 	connectDB()
+	initS3Client()
 	go syncWorker()
 	go syncOnConnectionRestoration()  // Start automatic sync on connection restore
 
@@ -2620,6 +2622,19 @@ func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	s3Key := fmt.Sprintf("uploads/%s", storedLegacyName)
 
+	// Direct S3 Object Storage Upload
+	if globalS3 != nil && globalS3.IsConfigured() {
+		if fileBytes, readErr := os.ReadFile(isolatedPath); readErr == nil {
+			go func(key string, data []byte, mType string, fname string) {
+				if s3URL, err := globalS3.UploadToS3(key, data, mType); err != nil {
+					log.Printf("[S3] ⚠️ Object upload error for %s: %v", fname, err)
+				} else {
+					log.Printf("[S3] ✅ Object stored: %s -> %s", fname, s3URL)
+				}
+			}(s3Key, fileBytes, mimeType, originalFilename)
+		}
+	}
+
 	// Save to DB file_assets bucket metadata
 	if isOnline() {
 		_, err := pgDB.Exec(`INSERT INTO file_assets(id, bucket, key, filename, mime_type, size_bytes, storage_path, sha256_hash)
@@ -2658,12 +2673,12 @@ func getFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := sanitizeFilename(chi.URLParam(r, "id"))
-	var filename, mimeType, storagePath string
+	var filename, mimeType, storagePath, assetKey string
 	var sizeBytes int64
 
 	if isOnline() {
-		_ = pgDB.QueryRow(`SELECT filename, mime_type, size_bytes, COALESCE(storage_path,'') 
-			FROM file_assets WHERE id=$1 OR key=$1 OR key LIKE '%' || $1 OR filename=$1`, id).Scan(&filename, &mimeType, &sizeBytes, &storagePath)
+		_ = pgDB.QueryRow(`SELECT filename, mime_type, size_bytes, COALESCE(storage_path,''), COALESCE(key,'') 
+			FROM file_assets WHERE id=$1 OR key=$1 OR key LIKE '%' || $1 OR filename=$1`, id).Scan(&filename, &mimeType, &sizeBytes, &storagePath, &assetKey)
 	}
 
 	if filename == "" {
@@ -2715,6 +2730,35 @@ func getFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if targetFile == nil {
+		// Try fetching directly from S3 Object Storage
+		if globalS3 != nil && globalS3.IsConfigured() {
+			s3KeyToFetch := assetKey
+			if s3KeyToFetch == "" {
+				s3KeyToFetch = fmt.Sprintf("uploads/%s", id)
+			}
+			if data, s3Mime, err := globalS3.DownloadFromS3(s3KeyToFetch); err == nil && len(data) > 0 {
+				if mimeType == "" {
+					mimeType = s3Mime
+				}
+				if mimeType == "" {
+					mimeType = mime.TypeByExtension(ext)
+				}
+				if isDangerousFile(ext) {
+					w.Header().Set("Content-Type", "application/octet-stream")
+					w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+				} else if isSafePreviewable(ext, mimeType) {
+					w.Header().Set("Content-Type", mimeType)
+					w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", filename))
+				} else {
+					w.Header().Set("Content-Type", mimeType)
+					w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+				}
+				w.Header().Set("Cache-Control", "public, max-age=86400")
+				http.ServeContent(w, r, filename, time.Now(), bytes.NewReader(data))
+				return
+			}
+		}
+
 		http.Error(w, "File not found or inaccessible", http.StatusNotFound)
 		return
 	}
@@ -2753,12 +2797,11 @@ func downloadFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := sanitizeFilename(chi.URLParam(r, "id"))
-	var filename string
-	var storagePath string
+	var filename, storagePath, assetKey string
 
 	if isOnline() {
-		_ = pgDB.QueryRow(`SELECT filename, COALESCE(storage_path,'') 
-			FROM file_assets WHERE id=$1 OR key=$1 OR key LIKE '%' || $1 OR filename=$1`, id).Scan(&filename, &storagePath)
+		_ = pgDB.QueryRow(`SELECT filename, COALESCE(storage_path,''), COALESCE(key,'') 
+			FROM file_assets WHERE id=$1 OR key=$1 OR key LIKE '%' || $1 OR filename=$1`, id).Scan(&filename, &storagePath, &assetKey)
 	}
 
 	if filename == "" {
@@ -2803,6 +2846,20 @@ func downloadFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if targetFile == nil {
+		// Try fetching directly from S3 Object Storage
+		if globalS3 != nil && globalS3.IsConfigured() {
+			s3KeyToFetch := assetKey
+			if s3KeyToFetch == "" {
+				s3KeyToFetch = fmt.Sprintf("uploads/%s", id)
+			}
+			if data, _, err := globalS3.DownloadFromS3(s3KeyToFetch); err == nil && len(data) > 0 {
+				w.Header().Set("Content-Type", "application/octet-stream")
+				w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+				http.ServeContent(w, r, filename, time.Now(), bytes.NewReader(data))
+				return
+			}
+		}
+
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
 	}
