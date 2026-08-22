@@ -338,6 +338,11 @@ func migrateSchema() {
 		`ALTER TABLE classes ADD COLUMN IF NOT EXISTS level_id TEXT DEFAULT ''`,
 		`ALTER TABLE classes ADD COLUMN IF NOT EXISTS created_by_type TEXT DEFAULT 'STANDARD_AUTO'`,
 		`ALTER TABLE classes ADD COLUMN IF NOT EXISTS custom_order INTEGER DEFAULT 0`,
+		`ALTER TABLE messages ADD COLUMN IF NOT EXISTS sender_name TEXT DEFAULT ''`,
+		`ALTER TABLE messages ADD COLUMN IF NOT EXISTS sender_role TEXT DEFAULT ''`,
+		`ALTER TABLE messages ADD COLUMN IF NOT EXISTS subject TEXT DEFAULT ''`,
+		`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT false`,
+		`ALTER TABLE messages ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT ''`,
 		`UPDATE classes SET full_class_name = name WHERE full_class_name = '' OR full_class_name IS NULL`,
 		`UPDATE schools SET class_naming_type = 'STANDARD' WHERE class_naming_type = '' OR class_naming_type IS NULL`,
 		`UPDATE schools SET section_config = 'NONE' WHERE section_config = '' OR section_config IS NULL`,
@@ -2746,23 +2751,30 @@ func listMessages(w http.ResponseWriter, r *http.Request) {
 	if isOnline() {
 		var q string; var args []interface{}
 		if box == "sent" {
-			q = `SELECT m.id,m.school_id,m.sender_id,COALESCE(su.name,''),COALESCE(su.role,''),m.recipient_id,COALESCE(ru.name,''),m.subject,m.body,m.is_read,m.created_at::text
+			q = `SELECT m.id,COALESCE(m.school_id,''),m.sender_id,COALESCE(NULLIF(m.sender_name,''),su.name,''),COALESCE(NULLIF(m.sender_role,''),su.role,''),m.recipient_id,COALESCE(ru.name,''),COALESCE(m.subject,''),COALESCE(m.body,''),COALESCE(m.is_read,false),COALESCE(CAST(m.created_at AS TEXT),'')
 				FROM messages m LEFT JOIN users su ON m.sender_id=su.id LEFT JOIN users ru ON m.recipient_id=ru.id
 				WHERE m.sender_id=$1 ORDER BY m.created_at DESC`
 			args = []interface{}{userID}
 		} else {
-			q = `SELECT m.id,m.school_id,m.sender_id,COALESCE(su.name,''),COALESCE(su.role,''),m.recipient_id,COALESCE(ru.name,''),m.subject,m.body,m.is_read,m.created_at::text
+			q = `SELECT m.id,COALESCE(m.school_id,''),m.sender_id,COALESCE(NULLIF(m.sender_name,''),su.name,''),COALESCE(NULLIF(m.sender_role,''),su.role,''),m.recipient_id,COALESCE(ru.name,''),COALESCE(m.subject,''),COALESCE(m.body,''),COALESCE(m.is_read,false),COALESCE(CAST(m.created_at AS TEXT),'')
 				FROM messages m LEFT JOIN users su ON m.sender_id=su.id LEFT JOIN users ru ON m.recipient_id=ru.id
 				WHERE m.recipient_id=$1 ORDER BY m.created_at DESC`
 			args = []interface{}{userID}
 		}
 		rows, err := pgDB.Query(q, args...)
-		if err != nil { jsonResp(w, []Message{}); return }
+		if err != nil {
+			log.Printf("[MESSAGES] listMessages query error: %v", err)
+			jsonResp(w, []Message{})
+			return
+		}
 		defer rows.Close()
 		for rows.Next() {
 			var msg Message
-			rows.Scan(&msg.ID, &msg.SchoolID, &msg.SenderID, &msg.SenderName, &msg.SenderRole, &msg.RecipientID, &msg.RecipientName, &msg.Subject, &msg.Body, &msg.IsRead, &msg.CreatedAt)
-			list = append(list, msg)
+			if err := rows.Scan(&msg.ID, &msg.SchoolID, &msg.SenderID, &msg.SenderName, &msg.SenderRole, &msg.RecipientID, &msg.RecipientName, &msg.Subject, &msg.Body, &msg.IsRead, &msg.CreatedAt); err == nil {
+				list = append(list, msg)
+			} else {
+				log.Printf("[MESSAGES] scan error: %v", err)
+			}
 		}
 	}
 	if list == nil { list = []Message{} }
@@ -2787,7 +2799,11 @@ func sendMessage(w http.ResponseWriter, r *http.Request) {
 	if isOnline() {
 		_, err := pgDB.Exec(`INSERT INTO messages(id,school_id,sender_id,sender_name,sender_role,recipient_id,subject,body,is_read,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,false,$9)`,
 			id, req.SchoolID, req.SenderID, req.SenderName, req.SenderRole, req.RecipientID, req.Subject, req.Body, now)
-		if err != nil { http.Error(w, err.Error(), http.StatusInternalServerError); return }
+		if err != nil {
+			log.Printf("[MESSAGES] sendMessage error: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 	jsonResp(w, map[string]string{"id": id, "message": "Sent"})
 }

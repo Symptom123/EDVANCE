@@ -411,19 +411,22 @@ export default function TeacherPortal() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         schoolId: config.schoolId,
-        senderId: config.id,
-        senderName: config.name,
+        senderId: config.id || config.userId,
+        senderName: config.name || 'Teacher',
         senderRole: 'Teacher',
-        recipientId: newMsg.recipientId,
+        recipientId: String(newMsg.recipientId),
         subject: newMsg.subject,
         body: newMsg.body
       })
-    }).then(r => {
+    }).then(async r => {
       if (r.ok) {
         setShowMsgModal(false);
         setNewMsg({ recipientId: '', subject: '', body: '' });
+        fetchMessages();
+      } else {
+        alert('Failed to send message: ' + await r.text());
       }
-    });
+    }).catch(err => alert('Error sending message: ' + err.message));
   };
 
   if (!config) return (

@@ -139,8 +139,8 @@ export default function StudentPortal() {
         const anns = await annRes.json();
         inbox = [...inbox, ...anns.map(a => ({ ...a, type: 'announcement', isRead: true, senderName: a.teacherName, subject: 'Announcement: ' + (a.title || 'Notice'), body: a.message }))];
       }
-      // sort by id descending (rough chronological)
-      inbox.sort((a,b) => (b.id || 0) - (a.id || 0));
+      // sort by date descending
+      inbox.sort((a, b) => new Date(b.createdAt || b.sent_at || 0) - new Date(a.createdAt || a.sent_at || 0));
       setInboxItems(inbox);
 
       // Attendance
@@ -1016,24 +1016,28 @@ export default function StudentPortal() {
     try {
       const payload = {
         schoolId: config.schoolId,
-        senderId: config.id,
-        senderName: config.name,
-        senderRole: config.userRole,
-        recipientId: parseInt(msgRecipient, 10),
+        senderId: config.id || config.userId,
+        senderName: config.name || 'Student',
+        senderRole: 'Student',
+        recipientId: String(msgRecipient),
         subject: msgSubject,
         body: msgBody
       };
       const res = await fetch(`${API}/api/messages`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       if (res.ok) {
         setShowCompose(false);
         setMsgSubject(''); setMsgBody(''); setMsgRecipient('');
-        alert('Message sent!');
+        alert('Message sent successfully!');
+      } else {
+        const errText = await res.text();
+        alert('Failed to send message: ' + errText);
       }
     } catch (e) {
-      alert('Error sending message');
+      alert('Error sending message: ' + e.message);
     } finally {
       setMsgSending(false);
     }

@@ -1103,10 +1103,25 @@ export default function AdminDashboard() {
       e.preventDefault();
       if (!msgRecipient || !msgSubject || !msgBody) { return; }
       try {
-        await fetch(`${API}/api/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schoolId: config.schoolId, senderId: config.id, senderName: config.name, senderRole: 'Admin', recipientId: msgRecipient, subject: msgSubject, body: msgBody }) });
+        const res = await fetch(`${API}/api/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            schoolId: config.schoolId,
+            senderId: config.id || config.userId,
+            senderName: config.name || 'Admin',
+            senderRole: 'Admin',
+            recipientId: String(msgRecipient),
+            subject: msgSubject,
+            body: msgBody
+          })
+        });
+        if (!res.ok) throw new Error(await res.text() || 'Failed to send');
         setMsgSent(true); setMsgRecipient(''); setMsgSubject(''); setMsgBody('');
         setTimeout(() => setMsgSent(false), 3000);
-      } catch { alert('Failed to send'); }
+        fetch(`${API}/api/messages?userId=${config.id || config.userId}&box=inbox`)
+          .then(r => r.json()).then(d => setMessages(Array.isArray(d) ? d : [])).catch(() => {});
+      } catch (err) { alert('Failed to send message: ' + err.message); }
     };
     const handleMarkRead = async (id) => {
       await fetch(`${API}/api/messages/${id}/read`, { method: 'PUT' });

@@ -153,7 +153,7 @@ export default function ParentPortal() {
     try {
       const API = (import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '');
       await fetch(`${API}/api/messages/${msgId}/read`, { method: 'PUT' });
-      setMessages(msgs => msgs.map(m => m.id === msgId ? { ...m, read: true } : m));
+      setMessages(msgs => msgs.map(m => m.id === msgId ? { ...m, isRead: true, read: true } : m));
     } catch(err) { console.error(err); }
   };
 
@@ -164,11 +164,11 @@ export default function ParentPortal() {
     try {
       const API = (import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '');
       const payload = {
-        schoolId: selectedChild.schoolId,
-        senderId: config.userId,
-        senderName: config.name,
+        schoolId: selectedChild?.schoolId || config.schoolId,
+        senderId: config.userId || config.id,
+        senderName: config.name || 'Parent',
         senderRole: 'Parent',
-        recipientId: parseInt(composeRecip),
+        recipientId: String(composeRecip),
         subject: composeSubject,
         body: composeBody
       };
@@ -181,7 +181,10 @@ export default function ParentPortal() {
         setShowCompose(false);
         setComposeSubject('');
         setComposeBody('');
-        fetchMessages(config.userId);
+        fetchMessages(config.userId || config.id);
+      } else {
+        const errText = await res.text();
+        alert('Failed to send message: ' + errText);
       }
     } catch(err) { console.error(err); }
     finally { setSendingMessage(false); }
@@ -367,20 +370,23 @@ export default function ParentPortal() {
 
       {loadingMessages ? <p style={{ color: T.muted }}>Loading messages...</p> : messages.length === 0 ? <p style={{color: T.muted}}>No messages yet.</p> : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {messages.map((msg, i) => (
-            <div key={i} onClick={() => { if(!msg.read) markRead(msg.id); }} style={{ ...cardStyle, display: 'flex', gap: 14, cursor: 'pointer', border: !msg.read ? `1.5px solid ${rgba(accent, 0.3)}` : `1px solid ${T.border}`, transition: 'box-shadow 0.15s' }}>
-              <div style={{ width: 44, height: 44, borderRadius: '50%', background: !msg.read ? rgba(accent, 0.1) : '#f9f7f4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 18, color: accent, flexShrink: 0 }}>{(msg.senderName || '?').charAt(0)}</div>
-              <div style={{ flex: 1, overflow: 'hidden' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                  <strong style={{ color: T.text, fontSize: 14 }}>{msg.senderName}</strong>
-                  <span style={{ fontSize: 12, color: T.light }}>{new Date(msg.createdAt).toLocaleDateString()}</span>
+          {messages.map((msg, i) => {
+            const isUnread = !msg.isRead && !msg.read;
+            return (
+              <div key={msg.id || i} onClick={() => { if(isUnread) markRead(msg.id); }} style={{ ...cardStyle, display: 'flex', gap: 14, cursor: 'pointer', border: isUnread ? `1.5px solid ${rgba(accent, 0.3)}` : `1px solid ${T.border}`, transition: 'box-shadow 0.15s', background: isUnread ? '#fff' : '#faf9f7' }}>
+                <div style={{ width: 44, height: 44, borderRadius: '50%', background: isUnread ? rgba(accent, 0.1) : '#f9f7f4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 18, color: accent, flexShrink: 0 }}>{(msg.senderName || '?').charAt(0)}</div>
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <strong style={{ color: T.text, fontSize: 14 }}>{msg.senderName}</strong>
+                    <span style={{ fontSize: 12, color: T.light }}>{msg.createdAt ? new Date(msg.createdAt).toLocaleDateString() : ''}</span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: 13, color: isUnread ? T.text : T.muted, fontWeight: isUnread ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{msg.subject}</p>
+                  <p style={{ margin: '4px 0 0', fontSize: 12, color: T.muted }}>{msg.body}</p>
                 </div>
-                <p style={{ margin: 0, fontSize: 13, color: !msg.read ? T.text : T.muted, fontWeight: !msg.read ? 500 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{msg.subject}</p>
-                <p style={{ margin: '4px 0 0', fontSize: 12, color: T.muted }}>{msg.body}</p>
+                {isUnread && <div style={{ width: 8, height: 8, borderRadius: '50%', background: accent, flexShrink: 0, marginTop: 4 }} />}
               </div>
-              {!msg.read && <div style={{ width: 8, height: 8, borderRadius: '50%', background: accent, flexShrink: 0, marginTop: 4 }} />}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
