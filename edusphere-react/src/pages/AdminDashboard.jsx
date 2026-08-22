@@ -82,6 +82,19 @@ export default function AdminDashboard() {
   const [rosterEnrollments, setRosterEnrollments] = useState([]);
   const [rosterStudentId, setRosterStudentId] = useState('');
   const [rosterLoading, setRosterLoading] = useState(false);
+  // Enhanced enrollment view state
+  const [enrollView, setEnrollView] = useState('classes'); // 'classes' | 'student'
+  const [selectedEnrollClass, setSelectedEnrollClass] = useState(null);
+  const [classEnrollments, setClassEnrollments] = useState({});  // { classId: [enrollment...] }
+  const [enrollLoadingAll, setEnrollLoadingAll] = useState(false);
+  const [selectedStudentProfile, setSelectedStudentProfile] = useState(null);
+  const [studentProfileData, setStudentProfileData] = useState({ marks: [], attendance: [], assignments: [] });
+  const [studentProfileLoading, setStudentProfileLoading] = useState(false);
+  const [moveStudentTarget, setMoveStudentTarget] = useState('');
+  const [moveStudentMsg, setMoveStudentMsg] = useState('');
+  const [editStudentMode, setEditStudentMode] = useState(false);
+  const [editStudentName, setEditStudentName] = useState('');
+  const [enrollSearchTerm, setEnrollSearchTerm] = useState('');
 
   useEffect(() => {
     const raw = localStorage.getItem('edvance_school_config');
@@ -1026,77 +1039,371 @@ export default function AdminDashboard() {
   );
 
   const renderEnrollment = () => {
-    const fetchClassEnrollments = async (classId) => {
-      if (!classId) return;
-      try {
-        const data = await fetch(`${API}/api/enrollments?classId=${classId}&schoolId=${config.schoolId}`).then(r => r.json());
-        setEnrollments(Array.isArray(data) ? data : []);
-      } catch { setEnrollments([]); }
+    const schoolId = config.schoolId;
+
+    const loadAllClassEnrollments = async () => {
+      setEnrollLoadingAll(true);
+      const result = {};
+      await Promise.all(classes.map(async (cls) => {
+        const id = cls.ID || cls.id;
+        try {
+          const data = await fetch(`${API}/api/enrollments?classId=${id}&schoolId=${schoolId}`).then(r => r.json());
+          result[id] = Array.isArray(data) ? data : [];
+        } catch { result[id] = []; }
+      }));
+      setClassEnrollments(result);
+      setEnrollLoadingAll(false);
     };
-    const handleEnroll = async () => {
-      if (!enrollClassId || !enrollStudentId) { setEnrollMsg('Please select both a class and a student.'); return; }
+
+    const openStudentProfile = async (student, enrolledClass) => {
+      setSelectedStudentProfile({ ...student, enrolledClass });
+      setEnrollView('student');
+      setStudentProfileLoading(true);
+      setMoveStudentTarget('');
+      setMoveStudentMsg('');
+      setEditStudentMode(false);
+      setEditStudentName(student.studentName || student.name || '');
       try {
-        const res = await fetch(`${API}/api/enrollments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schoolId: config.schoolId, classId: enrollClassId, studentId: enrollStudentId }) });
+        const [marksRes, attRes] = await Promise.all([
+          fetch(`${API}/api/marks?schoolId=${schoolId}&studentId=${student.studentId || student.id}`).then(r => r.json()).catch(() => []),
+          fetch(`${API}/api/attendance?schoolId=${schoolId}&studentId=${student.studentId || student.id}`).then(r => r.json()).catch(() => []),
+        ]);
+        setStudentProfileData({
+          marks: Array.isArray(marksRes) ? marksRes : [],
+          attendance: Array.isArray(attRes) ? attRes : [],
+          assignments: []
+        });
+      } catch { setStudentProfileData({ marks: [], attendance: [], assignments: [] }); }
+      setStudentProfileLoading(false);
+    };
+
+    const handleAddToClass = async (classId, studentId) => {
+      if (!classId || !studentId) { setEnrollMsg('Select both class and student.'); return; }
+      try {
+        const res = await fetch(`${API}/api/enrollments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schoolId, classId, studentId }) });
         if (!res.ok) throw new Error('Enrollment failed');
-        setEnrollMsg('Student enrolled successfully!');
-        fetchClassEnrollments(enrollClassId);
+        setEnrollMsg('Student added to class!');
+        await loadAllClassEnrollments();
         setTimeout(() => setEnrollMsg(''), 3000);
       } catch (err) { setEnrollMsg('Error: ' + err.message); }
     };
-    const handleUnenroll = async (classId, studentId) => {
+
+    const handleRemoveFromClass = async (classId, studentId) => {
       if (!window.confirm('Remove this student from the class?')) return;
       await fetch(`${API}/api/enrollments?classId=${classId}&studentId=${studentId}`, { method: 'DELETE' });
-      fetchClassEnrollments(enrollClassId);
+      setClassEnrollments(prev => ({
+        ...prev,
+        [classId]: (prev[classId] || []).filter(e => (e.studentId || e.id) !== studentId)
+      }));
+      if (selectedStudentProfile && (selectedStudentProfile.studentId === studentId || selectedStudentProfile.id === studentId)) {
+        setEnrollView('classes');
+        setSelectedStudentProfile(null);
+      }
     };
+
+    const handleMoveStudent = async () => {
+      if (!moveStudentTarget || !selectedStudentProfile) return;
+      const oldClassId = selectedStudentProfile.enrolledClass?.ID || selectedStudentProfile.enrolledClass?.id || selectedStudentProfile.classId;
+      const studentId = selectedStudentProfile.studentId || selectedStudentProfile.id;
+      try {
+        // Remove from old class, add to new
+        await fetch(`${API}/api/enrollments?classId=${oldClassId}&studentId=${studentId}`, { method: 'DELETE' });
+        const res = await fetch(`${API}/api/enrollments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schoolId, classId: moveStudentTarget, studentId }) });
+        if (!res.ok) throw new Error('Move failed');
+        setMoveStudentMsg('✓ Student moved successfully!');
+        await loadAllClassEnrollments();
+        // Update selected student's enrolled class
+        const newClass = classes.find(c => (c.ID || c.id) === moveStudentTarget);
+        setSelectedStudentProfile(prev => ({ ...prev, enrolledClass: newClass, classId: moveStudentTarget, className: newClass?.fullClassName || newClass?.name }));
+        setTimeout(() => setMoveStudentMsg(''), 3000);
+      } catch (err) { setMoveStudentMsg('Error: ' + err.message); }
+    };
+
+    const handleSaveStudentName = async () => {
+      if (!editStudentName.trim() || !selectedStudentProfile) return;
+      const studentId = selectedStudentProfile.studentId || selectedStudentProfile.id;
+      try {
+        await fetch(`${API}/api/users/${studentId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editStudentName.trim() }) });
+        setSelectedStudentProfile(prev => ({ ...prev, studentName: editStudentName.trim(), name: editStudentName.trim() }));
+        setEditStudentMode(false);
+        // Refresh student list
+        const data = await fetch(`${API}/api/users?schoolId=${schoolId}&role=Student`).then(r => r.json());
+        setStudents(Array.isArray(data) ? data : []);
+        await loadAllClassEnrollments();
+      } catch { alert('Failed to update student name'); }
+    };
+
+    const allEnrolledStudents = Object.values(classEnrollments).flat();
+    const unenrolledStudents = students.filter(s => !allEnrolledStudents.some(e => (e.studentId || e.id) === s.id));
+
+    // filtered classes + search
+    const filteredClasses = classes.filter(cls => {
+      if (!enrollSearchTerm) return true;
+      const term = enrollSearchTerm.toLowerCase();
+      const clsName = (cls.fullClassName || cls.name || '').toLowerCase();
+      if (clsName.includes(term)) return true;
+      const enrolled = classEnrollments[cls.ID || cls.id] || [];
+      return enrolled.some(e => (e.studentName || '').toLowerCase().includes(term));
+    });
+
+    // ──────────── STUDENT PROFILE VIEW ────────────
+    if (enrollView === 'student' && selectedStudentProfile) {
+      const sp = selectedStudentProfile;
+      const marks = studentProfileData.marks;
+      const attendance = studentProfileData.attendance;
+      const presentCount = attendance.filter(a => a.status === 'Present' || a.status === 'present').length;
+      const absentCount = attendance.filter(a => a.status === 'Absent' || a.status === 'absent').length;
+      const avgScore = marks.length > 0 ? (marks.reduce((s, m) => s + (Number(m.score) || 0), 0) / marks.length).toFixed(1) : 'N/A';
+      const studentId = sp.studentId || sp.id;
+      const currentClassId = sp.enrolledClass ? (sp.enrolledClass.ID || sp.enrolledClass.id) : sp.classId;
+      const otherClasses = classes.filter(c => (c.ID || c.id) !== currentClassId);
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Breadcrumb */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button onClick={() => { setEnrollView('classes'); setSelectedStudentProfile(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: accent, fontFamily: T.fontSans, fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, padding: 0 }}>
+              ← Back to Classes
+            </button>
+            <span style={{ color: T.light }}>/</span>
+            <span style={{ color: T.muted, fontSize: 14 }}>{sp.studentName || sp.name}</span>
+          </div>
+
+          {/* Profile Header */}
+          <div style={{ ...cardStyle, display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
+            <div style={{ width: 72, height: 72, borderRadius: '50%', background: `linear-gradient(135deg, ${rgba(accent, 0.15)}, ${rgba(accent, 0.3)})`, border: `2px solid ${rgba(accent, 0.4)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 28, color: accent, flexShrink: 0 }}>
+              {(sp.studentName || sp.name || '?').charAt(0)}
+            </div>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              {editStudentMode ? (
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+                  <input value={editStudentName} onChange={e => setEditStudentName(e.target.value)} style={{ ...inputStyle, maxWidth: 260, padding: '8px 12px' }} />
+                  <button onClick={handleSaveStudentName} style={btnStyle(accent)}>Save</button>
+                  <button onClick={() => setEditStudentMode(false)} style={{ ...btnStyle('#6b7280'), marginLeft: 4 }}>Cancel</button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+                  <h2 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 26, fontWeight: 400, margin: 0, color: T.text }}>{sp.studentName || sp.name}</h2>
+                  <button onClick={() => setEditStudentMode(true)} style={{ background: 'none', border: `1px solid ${T.border}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 12, color: T.muted, fontFamily: T.fontSans }}><Edit2 size={11} /> Edit</button>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <span style={badge(accent, rgba(accent, 0.1))}>Student</span>
+                <span style={{ fontSize: 13, color: T.muted }}><strong style={{ color: T.text }}>Class:</strong> {sp.enrolledClass?.fullClassName || sp.enrolledClass?.name || sp.className || 'Unassigned'}</span>
+                <span style={{ fontSize: 13, color: T.muted }}><strong style={{ color: T.text }}>Email:</strong> {sp.email || 'N/A'}</span>
+              </div>
+            </div>
+            {/* Stats mini row */}
+            <div style={{ display: 'flex', gap: 16 }}>
+              {[{ label: 'Avg Score', val: avgScore }, { label: 'Present', val: presentCount }, { label: 'Absent', val: absentCount }].map(s => (
+                <div key={s.label} style={{ textAlign: 'center', padding: '12px 16px', borderRadius: 10, background: isDark ? '#0f172a' : '#f9f7f4', border: `1px solid ${T.border}` }}>
+                  <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color: accent }}>{s.val}</p>
+                  <p style={{ margin: 0, fontSize: 11, color: T.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{s.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Move to Class + Remove */}
+          <div style={{ ...cardStyle }}>
+            <p style={{ fontWeight: 700, color: T.text, margin: '0 0 14px', fontSize: 14 }}>Class Assignment</p>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 180 }}>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: T.muted, marginBottom: 6, textTransform: 'uppercase' }}>Move to Class</label>
+                <select value={moveStudentTarget} onChange={e => setMoveStudentTarget(e.target.value)} style={{ ...inputStyle, background: isDark ? '#0f172a' : '#fff' }}>
+                  <option value="">-- Select target class --</option>
+                  {otherClasses.map(c => <option key={c.ID || c.id} value={c.ID || c.id}>{c.fullClassName || c.name}</option>)}
+                </select>
+              </div>
+              <button onClick={handleMoveStudent} disabled={!moveStudentTarget} style={{ ...btnStyle(accent), opacity: moveStudentTarget ? 1 : 0.5 }}>↔ Move</button>
+              <button onClick={() => handleRemoveFromClass(currentClassId, studentId)} style={{ ...btnStyle('#ef4444', true), borderColor: '#ef4444' }}><Trash2 size={14} /> Remove from Class</button>
+            </div>
+            {moveStudentMsg && <p style={{ marginTop: 10, fontSize: 13, color: moveStudentMsg.includes('Error') ? '#ef4444' : '#15803d', fontWeight: 500 }}>{moveStudentMsg}</p>}
+          </div>
+
+          {/* Grades */}
+          <div style={{ ...cardStyle }}>
+            <p style={{ fontWeight: 700, color: T.text, margin: '0 0 16px', fontSize: 14 }}>Grades & Marks</p>
+            {studentProfileLoading ? <div style={{ padding: 20, textAlign: 'center', color: T.muted }}>Loading...</div> :
+              marks.length === 0 ? <div style={{ padding: '24px', textAlign: 'center', color: T.muted }}>No marks recorded yet.</div> : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: T.fontSans, fontSize: 13 }}>
+                <thead><tr style={{ background: isDark ? '#151f30' : '#faf9f7' }}>
+                  {['Subject', 'Sequence', 'Score', 'Grade'].map(h => <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', borderBottom: `1px solid ${T.border}` }}>{h}</th>)}
+                </tr></thead>
+                <tbody>{marks.map((m, i) => {
+                  const score = Number(m.score) || 0;
+                  const grade = score >= 85 ? 'A' : score >= 70 ? 'B' : score >= 55 ? 'C' : score >= 40 ? 'D' : 'F';
+                  const gradeColor = score >= 70 ? '#15803d' : score >= 55 ? '#d97706' : '#ef4444';
+                  return (
+                    <tr key={i} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
+                      <td style={{ padding: '10px 14px', color: T.text, fontWeight: 500 }}>{m.subjectName || m.subject || '—'}</td>
+                      <td style={{ padding: '10px 14px', color: T.muted }}>{m.sequenceName || m.sequence || '—'}</td>
+                      <td style={{ padding: '10px 14px', color: T.text, fontWeight: 600 }}>{m.score}</td>
+                      <td style={{ padding: '10px 14px' }}><span style={badge(gradeColor, gradeColor + '18')}>{grade}</span></td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Attendance */}
+          <div style={{ ...cardStyle }}>
+            <p style={{ fontWeight: 700, color: T.text, margin: '0 0 16px', fontSize: 14 }}>Attendance Record</p>
+            {studentProfileLoading ? <div style={{ padding: 20, textAlign: 'center', color: T.muted }}>Loading...</div> :
+              attendance.length === 0 ? <div style={{ padding: '24px', textAlign: 'center', color: T.muted }}>No attendance recorded yet.</div> : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: T.fontSans, fontSize: 13 }}>
+                <thead><tr style={{ background: isDark ? '#151f30' : '#faf9f7' }}>
+                  {['Date', 'Status', 'Class'].map(h => <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: T.light, textTransform: 'uppercase', borderBottom: `1px solid ${T.border}` }}>{h}</th>)}
+                </tr></thead>
+                <tbody>{attendance.map((a, i) => {
+                  const isPresent = (a.status || '').toLowerCase() === 'present';
+                  return (
+                    <tr key={i} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
+                      <td style={{ padding: '10px 14px', color: T.text }}>{a.date ? new Date(a.date).toLocaleDateString() : a.date}</td>
+                      <td style={{ padding: '10px 14px' }}><span style={badge(isPresent ? '#15803d' : '#ef4444', isPresent ? '#f0fdf4' : '#fef2f2')}>{a.status}</span></td>
+                      <td style={{ padding: '10px 14px', color: T.muted }}>{a.className || '—'}</td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ──────────── CLASSES VIEW (default) ────────────
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div><p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Class Management</p><h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Student Enrollment</h1></div>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <p style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', color: T.light, margin: '0 0 6px' }}>Class Management</p>
+            <h1 style={{ fontFamily: T.fontSerif, fontStyle: 'italic', fontSize: 34, fontWeight: 400, margin: 0, color: T.text }}>Student Enrollment</h1>
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              placeholder="Search class or student..."
+              value={enrollSearchTerm}
+              onChange={e => setEnrollSearchTerm(e.target.value)}
+              style={{ ...inputStyle, maxWidth: 240, padding: '9px 14px' }}
+            />
+            <button onClick={loadAllClassEnrollments} style={{ ...btnStyle(accent), gap: 6 }}>
+              {enrollLoadingAll ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Users size={14} />}
+              Load All Classes
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Add to Class */}
         <div style={{ ...cardStyle }}>
-          <p style={{ fontWeight: 600, color: T.text, margin: '0 0 16px' }}>Enroll a Student in a Class</p>
+          <p style={{ fontWeight: 700, color: T.text, margin: '0 0 14px', fontSize: 14 }}>Add Student to a Class</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, alignItems: 'flex-end' }}>
             <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Select Class</label>
-              <select value={enrollClassId} onChange={e => { setEnrollClassId(e.target.value); setTimeout(() => {}, 0); }} style={{ ...inputStyle, background: '#fff' }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: T.muted, marginBottom: 6, textTransform: 'uppercase' }}>Select Class</label>
+              <select value={enrollClassId} onChange={e => setEnrollClassId(e.target.value)} style={{ ...inputStyle, background: isDark ? '#0f172a' : '#fff' }}>
                 <option value="">-- Choose Class --</option>
                 {classes.map(c => <option key={c.ID || c.id} value={c.ID || c.id}>{c.fullClassName || c.name}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Select Student</label>
-              <select value={enrollStudentId} onChange={e => setEnrollStudentId(e.target.value)} style={{ ...inputStyle, background: '#fff' }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: T.muted, marginBottom: 6, textTransform: 'uppercase' }}>Select Student</label>
+              <select value={enrollStudentId} onChange={e => setEnrollStudentId(e.target.value)} style={{ ...inputStyle, background: isDark ? '#0f172a' : '#fff' }}>
                 <option value="">-- Choose Student --</option>
                 {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
-            <button onClick={handleEnroll} style={btnStyle(accent)}><Plus size={15} />Enroll</button>
+            <button onClick={() => handleAddToClass(enrollClassId, enrollStudentId)} style={btnStyle(accent)}><Plus size={15} /> Add</button>
           </div>
           {enrollMsg && <p style={{ marginTop: 10, fontSize: 13, color: enrollMsg.includes('Error') ? '#ef4444' : '#15803d', fontWeight: 500 }}>{enrollMsg}</p>}
         </div>
-        <div style={{ ...cardStyle }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <p style={{ fontWeight: 600, color: T.text, margin: 0 }}>Current Enrollments</p>
-            <select value={enrollClassId} onChange={e => { setEnrollClassId(e.target.value); fetchClassEnrollments(e.target.value); }} style={{ ...inputStyle, background: '#fff', maxWidth: 220 }}>
-              <option value="">-- Select class to view --</option>
-              {classes.map(c => <option key={c.ID || c.id} value={c.ID || c.id}>{c.fullClassName || c.name}</option>)}
-            </select>
+
+        {/* Classes Grid */}
+        {classes.length === 0 ? (
+          <div style={{ ...cardStyle, textAlign: 'center', padding: 40, color: T.muted }}>No classes created yet. Create classes first.</div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 18 }}>
+            {filteredClasses.map(cls => {
+              const classId = cls.ID || cls.id;
+              const enrolled = classEnrollments[classId] || [];
+              const isExpanded = selectedEnrollClass === classId;
+              return (
+                <div key={classId} style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+                  {/* Class Header */}
+                  <div
+                    onClick={() => setSelectedEnrollClass(isExpanded ? null : classId)}
+                    style={{ padding: '18px 20px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: isExpanded ? rgba(accent, 0.06) : 'transparent', borderBottom: isExpanded ? `1px solid ${T.border}` : 'none', transition: 'background 0.15s' }}
+                  >
+                    <div>
+                      <p style={{ margin: 0, fontWeight: 700, color: T.text, fontSize: 15 }}>{cls.fullClassName || cls.name}</p>
+                      <p style={{ margin: '4px 0 0', fontSize: 12, color: T.muted }}>{enrolled.length} student{enrolled.length !== 1 ? 's' : ''} enrolled {cls.capacity ? `/ ${cls.capacity} capacity` : ''}</p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ ...badge(accent, rgba(accent, 0.12)), fontSize: 13, fontWeight: 700 }}>{enrolled.length}</span>
+                      <span style={{ color: T.muted, fontSize: 18, transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0)' }}>›</span>
+                    </div>
+                  </div>
+
+                  {/* Expanded Student List */}
+                  {isExpanded && (
+                    <div>
+                      {enrolled.length === 0 ? (
+                        <div style={{ padding: '20px', textAlign: 'center', color: T.muted, fontSize: 13 }}>No students enrolled in this class.</div>
+                      ) : (
+                        enrolled.filter(e => !enrollSearchTerm || (e.studentName || '').toLowerCase().includes(enrollSearchTerm.toLowerCase())).map((enr, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '12px 20px', borderBottom: `1px solid ${T.borderLight}`, justifyContent: 'space-between' }}>
+                            <button
+                              onClick={() => openStudentProfile(enr, cls)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, padding: 0, textAlign: 'left' }}
+                            >
+                              <div style={{ width: 32, height: 32, borderRadius: '50%', background: rgba(accent, 0.12), border: `1.5px solid ${rgba(accent, 0.25)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, color: accent, flexShrink: 0 }}>
+                                {(enr.studentName || '?').charAt(0)}
+                              </div>
+                              <div>
+                                <p style={{ margin: 0, fontWeight: 600, color: T.text, fontSize: 13 }}>{enr.studentName}</p>
+                                <p style={{ margin: 0, fontSize: 11, color: T.muted }}>{enr.email || 'Click to view profile'}</p>
+                              </div>
+                            </button>
+                            <button
+                              onClick={() => handleRemoveFromClass(classId, enr.studentId || enr.id)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px 8px', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontFamily: T.fontSans }}
+                            >
+                              <Trash2 size={13} /> Remove
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-          {enrollments.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: T.muted }}>{enrollClassId ? 'No students enrolled in this class yet.' : 'Select a class to view enrollments.'}</div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: T.fontSans }}>
-              <thead><tr style={{ background: '#faf9f7' }}>
-                {['Student Name', 'Class', ''].map(h => <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: T.light, textTransform: 'uppercase', borderBottom: `1px solid ${T.border}` }}>{h}</th>)}
-              </tr></thead>
-              <tbody>{enrollments.map(e => (
-                <tr key={e.id} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
-                  <td style={{ padding: '12px 16px', fontWeight: 600, color: T.text }}>{e.studentName}</td>
-                  <td style={{ padding: '12px 16px', color: T.muted, fontSize: 13 }}>{e.className}</td>
-                  <td style={{ padding: '12px 16px' }}><button onClick={() => handleUnenroll(e.classId, e.studentId)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 13, fontWeight: 500, fontFamily: T.fontSans, display: 'flex', alignItems: 'center', gap: 4 }}><Trash2 size={13} />Remove</button></td>
-                </tr>
-              ))}</tbody>
-            </table>
-          )}
-        </div>
+        )}
+
+        {/* Unenrolled Students */}
+        {unenrolledStudents.length > 0 && (
+          <div style={{ ...cardStyle }}>
+            <p style={{ fontWeight: 700, color: T.text, margin: '0 0 14px', fontSize: 14 }}>
+              Unenrolled Students <span style={badge('#d97706', '#fffbeb')}>{unenrolledStudents.length}</span>
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              {unenrolledStudents.map(s => (
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: isDark ? '#1e293b' : '#fafaf9' }}>
+                  <span style={{ fontSize: 13, color: T.text, fontWeight: 500 }}>{s.name}</span>
+                  <select
+                    onChange={async (e) => { if (e.target.value) await handleAddToClass(e.target.value, s.id); e.target.value = ''; }}
+                    style={{ fontSize: 12, border: `1px solid ${T.border}`, borderRadius: 6, padding: '3px 6px', background: isDark ? '#0f172a' : '#fff', color: T.text, cursor: 'pointer' }}
+                  >
+                    <option value="">Assign to class...</option>
+                    {classes.map(c => <option key={c.ID || c.id} value={c.ID || c.id}>{c.fullClassName || c.name}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   };
