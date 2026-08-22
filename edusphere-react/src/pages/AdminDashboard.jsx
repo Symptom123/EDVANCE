@@ -177,9 +177,28 @@ export default function AdminDashboard() {
 
   const handleRegisterUser = async (e) => {
     e.preventDefault(); setIsSubmitting(true); setFormError(null); setFormSuccess(null);
+    if (!config?.schoolId) {
+      setFormError('School ID is missing. Please log out and log back in.');
+      setIsSubmitting(false);
+      return;
+    }
     try {
-      const res = await fetch(`${API}/api/users`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schoolId: config.schoolId, name: newUserName, role: newUserRole }) });
-      if (!res.ok) throw new Error('Registration failed');
+      const res = await fetch(`${API}/api/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schoolId: config.schoolId, name: newUserName.trim(), role: newUserRole })
+      });
+      if (!res.ok) {
+        let errTxt = 'Registration failed';
+        try {
+          const errData = await res.json();
+          errTxt = errData.error || errData.message || JSON.stringify(errData);
+        } catch {
+          const txt = await res.text();
+          if (txt) errTxt = txt;
+        }
+        throw new Error(errTxt);
+      }
       const data = await res.json();
       setFormSuccess({ email: data.email, password: data.tempPassword, name: newUserName });
       setNewUserName('');

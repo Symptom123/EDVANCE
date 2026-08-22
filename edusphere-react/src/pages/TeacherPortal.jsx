@@ -102,7 +102,7 @@ export default function TeacherPortal() {
     fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/dashboard/teacher/${tid}?schoolId=${sid}`)
       .then(r => r.json())
       .then(d => {
-        setDashData(d || { classes: 0, students: 0, avgScore: 0, chartData: [] });
+        setDashData((d && typeof d === 'object' && !d.error) ? d : { classes: 0, students: 0, avgScore: 0, chartData: [] });
         setDashLoading(false);
       }).catch(() => setDashLoading(false));
 
@@ -110,32 +110,36 @@ export default function TeacherPortal() {
     fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/classes?schoolId=${sid}`)
       .then(r => r.json())
       .then(c => {
-        const mine = (c || []).filter(cls => !cls.teacherId || cls.teacherId === tid || cls.teacherId === config.name || String(cls.teacherId) === String(tid));
-        setMyClasses(mine.length > 0 ? mine : (c || []));
-        if (mine.length > 0) {
-          setAttClassId(mine[0].id || mine[0].ID);
-          setGradingClassId(mine[0].id || mine[0].ID);
-          setAssignClassId(mine[0].id || mine[0].ID);
-          setAnnClassId(mine[0].id || mine[0].ID);
+        const classList = Array.isArray(c) ? c : [];
+        const mine = classList.filter(cls => !cls.teacherId || cls.teacherId === tid || cls.teacherId === config.name || String(cls.teacherId) === String(tid));
+        const list = mine.length > 0 ? mine : classList;
+        setMyClasses(list);
+        if (list.length > 0) {
+          setAttClassId(list[0].id || list[0].ID);
+          setGradingClassId(list[0].id || list[0].ID);
+          setAssignClassId(list[0].id || list[0].ID);
+          setAnnClassId(list[0].id || list[0].ID);
         }
-      });
+      }).catch(() => setMyClasses([]));
 
     // Fetch sequences
-    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/sequences?schoolId=${config.schoolId}`)
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/sequences?schoolId=${sid}`)
       .then(r => r.json())
-      .then(s => setSequences(s || []));
+      .then(s => setSequences(Array.isArray(s) ? s : []))
+      .catch(() => setSequences([]));
 
     // Fetch users for messages
-    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/users?schoolId=${config.schoolId}`)
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/users?schoolId=${sid}`)
       .then(r => r.json())
       .then(u => {
-        setMsgUsers((u || []).filter(user => user.id !== config.id));
-      });
+        setMsgUsers((Array.isArray(u) ? u : []).filter(user => user.id !== config.id));
+      }).catch(() => setMsgUsers([]));
 
     // Fetch all students for class enrollment management
-    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/users?schoolId=${config.schoolId}&role=Student`)
+    fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/users?schoolId=${sid}&role=Student`)
       .then(r => r.json())
-      .then(s => setAllSchoolStudents(s || []));
+      .then(s => setAllSchoolStudents(Array.isArray(s) ? s : []))
+      .catch(() => setAllSchoolStudents([]));
 
   }, [config]);
 
@@ -145,24 +149,26 @@ export default function TeacherPortal() {
     setAttLoading(true);
     
     Promise.all([
-      fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/enrollments?schoolId=${config.schoolId}&classId=${attClassId}`).then(r => r.json()),
-      fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/attendance?schoolId=${config.schoolId}&classId=${attClassId}&date=${attDate}`).then(r => r.json())
+      fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/enrollments?schoolId=${config.schoolId}&classId=${attClassId}`).then(r => r.json()).catch(() => []),
+      fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/attendance?schoolId=${config.schoolId}&classId=${attClassId}&date=${attDate}`).then(r => r.json()).catch(() => [])
     ]).then(([enr, att]) => {
-      setAttStudents(enr || []);
+      const enrList = Array.isArray(enr) ? enr : [];
+      const attList = Array.isArray(att) ? att : [];
+      setAttStudents(enrList);
       const attMap = {};
-      (att || []).forEach(record => {
-        if (record.records) {
+      attList.forEach(record => {
+        if (record && record.records) {
           Object.assign(attMap, record.records);
         }
       });
       // Initialize default
       const defaultMap = { ...attMap };
-      (enr || []).forEach(s => {
-        if (!defaultMap[s.studentId]) defaultMap[s.studentId] = 'present';
+      enrList.forEach(s => {
+        if (s && s.studentId && !defaultMap[s.studentId]) defaultMap[s.studentId] = 'present';
       });
       setAttendance(defaultMap);
       setAttLoading(false);
-    });
+    }).catch(() => setAttLoading(false));
   }, [config, activeTab, attClassId, attDate]);
 
   const handleSaveAttendance = () => {
@@ -195,17 +201,19 @@ export default function TeacherPortal() {
     setGradLoading(true);
 
     Promise.all([
-      fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/enrollments?schoolId=${config.schoolId}&classId=${gradingClassId}`).then(r => r.json()),
-      fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/marks?schoolId=${config.schoolId}&classId=${gradingClassId}&sequenceId=${gradingSequenceId}`).then(r => r.json())
+      fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/enrollments?schoolId=${config.schoolId}&classId=${gradingClassId}`).then(r => r.json()).catch(() => []),
+      fetch(`${(import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com').replace(/\/+$/, '')}/api/marks?schoolId=${config.schoolId}&classId=${gradingClassId}&sequenceId=${gradingSequenceId}`).then(r => r.json()).catch(() => [])
     ]).then(([enr, marksData]) => {
-      setGradStudents(enr || []);
+      const enrList = Array.isArray(enr) ? enr : [];
+      const marksList = Array.isArray(marksData) ? marksData : [];
+      setGradStudents(enrList);
       const m = {};
-      (marksData || []).forEach(mk => {
-        m[mk.studentId] = mk.score;
+      marksList.forEach(mk => {
+        if (mk && mk.studentId) m[mk.studentId] = mk.score;
       });
       setMarks(m);
       setGradLoading(false);
-    });
+    }).catch(() => setGradLoading(false));
   }, [config, activeTab, gradingClassId, gradingSequenceId]);
 
   const handleSaveMarks = () => {

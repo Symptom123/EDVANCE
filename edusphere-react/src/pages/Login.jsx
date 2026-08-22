@@ -53,8 +53,8 @@ export default function Login() {
       try { cfg = JSON.parse(school.configJson || '{}'); } catch (_) {}
 
       const configToCache = {
-        schoolId: school.ID || school.id || '',
-        schoolName: school.name || 'Edvance School',
+        schoolId: school.ID || school.id || data.schoolId || data.school_id || '',
+        schoolName: school.name || school.Name || 'Edvance School',
         primaryColor: school.primaryColor || '#2563eb',
         levels: { primary: school.hasPrimary, secondary: school.hasSecondary },
         features: school.features || {},

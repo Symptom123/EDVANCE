@@ -1049,7 +1049,7 @@ func updateSchoolSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if isOnline() {
 		pgDB.Exec(`UPDATE schools SET primary_color=$1, features=$2 WHERE id=$3`, req.PrimaryColor, featuresJSON(req.Features), id)
-		row := pgDB.QueryRow(`SELECT id,name,primary_color,has_primary,has_secondary,config_json,admin_id,features FROM schools WHERE id=$1`, id)
+		row := pgDB.QueryRow(`SELECT id,name,primary_color,has_primary,has_secondary,config_json,admin_id,features, COALESCE(class_naming_type, 'STANDARD'), COALESCE(section_config, 'NONE') FROM schools WHERE id=$1`, id)
 		s, _ := scanSchool(row)
 		jsonResp(w, s)
 	} else {
@@ -1103,7 +1103,7 @@ func findUser(email, password string) *User {
 
 func findSchool(id string) School {
 	if isOnline() {
-		row := pgDB.QueryRow(`SELECT id,name,primary_color,has_primary,has_secondary,config_json,admin_id,features FROM schools WHERE id=$1`, id)
+		row := pgDB.QueryRow(`SELECT id,name,primary_color,has_primary,has_secondary,config_json,admin_id,features, COALESCE(class_naming_type, 'STANDARD'), COALESCE(section_config, 'NONE') FROM schools WHERE id=$1`, id)
 		s, _ := scanSchool(row)
 		return s
 	}
@@ -1237,6 +1237,21 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	req.SchoolID = strings.TrimSpace(req.SchoolID)
+	req.Name = strings.TrimSpace(req.Name)
+	req.Role = strings.TrimSpace(req.Role)
+	if req.SchoolID == "" || req.SchoolID == "undefined" || req.SchoolID == "null" {
+		http.Error(w, "schoolId is required to register a user", http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" {
+		http.Error(w, "Name is required", http.StatusBadRequest)
+		return
+	}
+	if req.Role == "" {
+		req.Role = "Teacher"
+	}
+
 	schoolName := ""
 	if isOnline() {
 		pgDB.QueryRow(`SELECT name FROM schools WHERE id=$1`, req.SchoolID).Scan(&schoolName)
@@ -1245,11 +1260,14 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 		for _, s := range localDB.Schools { if s.ID == req.SchoolID { schoolName = s.Name; break } }
 		localDBMu.RUnlock()
 	}
-	if schoolName == "" { http.Error(w, "School not found", http.StatusNotFound); return }
+	if schoolName == "" {
+		schoolName = "school"
+	}
 
 	// Trim spaces and normalize name and school for email generation
 	cleanName := strings.TrimSpace(strings.ReplaceAll(strings.ToLower(req.Name), " ", "."))
 	cleanSchool := strings.ReplaceAll(strings.ToLower(schoolName), " ", "")
+	if cleanSchool == "" { cleanSchool = "school" }
 	email := fmt.Sprintf("%s@%s.edvance.com", cleanName, cleanSchool)
 
 	// Ensure unique email
@@ -1257,11 +1275,11 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 		taken := false
 		if isOnline() {
 			var c int
-			pgDB.QueryRow(`SELECT COUNT(*) FROM users WHERE email=$1`, email).Scan(&c)
+			pgDB.QueryRow(`SELECT COUNT(*) FROM users WHERE LOWER(email)=LOWER($1)`, email).Scan(&c)
 			taken = c > 0
 		} else {
 			localDBMu.RLock()
-			for _, u := range localDB.Users { if u.Email == email { taken = true; break } }
+			for _, u := range localDB.Users { if strings.EqualFold(u.Email, email) { taken = true; break } }
 			localDBMu.RUnlock()
 		}
 		if !taken { break }
@@ -1275,8 +1293,12 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if isOnline() {
-		pgDB.Exec(`INSERT INTO users(id,school_id,name,email,password,role,first_login) VALUES($1,$2,$3,$4,$5,$6,$7)`,
-			newUser.ID, newUser.SchoolID, newUser.Name, newUser.Email, newUser.Password, newUser.Role, newUser.FirstLogin)
+		if _, err := pgDB.Exec(`INSERT INTO users(id,school_id,name,email,password,role,first_login) VALUES($1,$2,$3,$4,$5,$6,$7)`,
+			newUser.ID, newUser.SchoolID, newUser.Name, newUser.Email, newUser.Password, newUser.Role, newUser.FirstLogin); err != nil {
+			log.Printf("[Users] createUser INSERT error: %v", err)
+			http.Error(w, fmt.Sprintf("Failed to create user: %v", err), http.StatusInternalServerError)
+			return
+		}
 	} else {
 		localDBMu.Lock()
 		localDB.Users = append(localDB.Users, newUser)
