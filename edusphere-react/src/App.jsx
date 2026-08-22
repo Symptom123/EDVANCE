@@ -9,6 +9,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import StudentPortal from './pages/StudentPortal';
 import TeacherPortal from './pages/TeacherPortal';
 import ParentPortal from './pages/ParentPortal';
+import { ThemeProvider } from './context/ThemeContext';
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -100,19 +101,21 @@ class ErrorBoundary extends Component {
 function App() {
   return (
     <ErrorBoundary>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/register" element={<CreateSchool />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/student" element={<StudentPortal />} />
-          <Route path="/teacher" element={<TeacherPortal />} />
-          <Route path="/parent" element={<ParentPortal />} />
-          <Route path="/portal/primary" element={<PrimaryPortal />} />
-          <Route path="/portal/secondary" element={<SecondaryPortal />} />
-        </Routes>
-      </BrowserRouter>
+      <ThemeProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/register" element={<CreateSchool />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/student" element={<StudentPortal />} />
+            <Route path="/teacher" element={<TeacherPortal />} />
+            <Route path="/parent" element={<ParentPortal />} />
+            <Route path="/portal/primary" element={<PrimaryPortal />} />
+            <Route path="/portal/secondary" element={<SecondaryPortal />} />
+          </Routes>
+        </BrowserRouter>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

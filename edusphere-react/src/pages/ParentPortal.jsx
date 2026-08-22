@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LayoutDashboard, CheckSquare, Award, Mail, LogOut, FileText, Send, X, Plus, User, Menu, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Eye, Paperclip, Download, FileCheck } from 'lucide-react';
 import { T, rgba, navItemStyle, cardStyle, badge, inputStyle, btnStyle } from '../styles/portalTheme';
+import { useTheme } from '../context/ThemeContext';
+import ThemeToggle from '../components/ThemeToggle';
 import DocumentViewerModal, { triggerFileDownload, formatFileSize } from '../components/DocumentViewerModal';
 
 export default function ParentPortal() {
   const navigate = useNavigate();
+  const { isDark, T, cardStyle, inputStyle } = useTheme();
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -601,11 +604,14 @@ export default function ParentPortal() {
 
       {/* MOBILE HEADER */}
       <div className="portal-mobile-header print-hide">
-        <button className="portal-mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle navigation">
-          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
-        <img src="/logo.png" alt="Edvance Logo" style={{ height: 30, objectFit: 'contain' }} />
-        <span className="portal-mobile-role-badge">Parent</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button className="portal-mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle navigation">
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+          <img src="/logo.png" alt="Edvance Logo" style={{ height: 30, objectFit: 'contain' }} />
+          <span className="portal-mobile-role-badge">Parent</span>
+        </div>
+        <ThemeToggle compact />
       </div>
 
       {/* MOBILE SLIDING DRAWER & BACKDROP */}
@@ -632,7 +638,7 @@ export default function ParentPortal() {
                       setSelectedChild(c);
                       setMobileMenuOpen(false);
                     }}
-                    style={{ ...navItemStyle(selectedChild?.id === c.id, accent), marginBottom: 2 }}
+                    style={{ ...navItemStyle(selectedChild?.id === c.id, accent, isDark), marginBottom: 2 }}
                   >
                     <User size={14} /> {c.name}
                   </button>
@@ -648,14 +654,14 @@ export default function ParentPortal() {
                     setActiveTab(item.id);
                     setMobileMenuOpen(false);
                   }}
-                  style={navItemStyle(activeTab === item.id, accent)}
+                  style={navItemStyle(activeTab === item.id, accent, isDark)}
                 >
                   <item.icon size={16} /> {item.label}
                 </button>
               ))}
             </nav>
             <div style={{ padding: '16px 12px', borderTop: `1px solid ${T.borderLight}` }}>
-              <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444'), color: '#ef4444' }}>
+              <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444', isDark), color: '#ef4444' }}>
                 <LogOut size={16} /> Sign Out
               </button>
             </div>
@@ -687,7 +693,7 @@ export default function ParentPortal() {
                   onClick={() => {
                     setSelectedChild(c);
                   }}
-                  style={{ ...navItemStyle(selectedChild?.id === c.id, accent), marginBottom: 2 }}
+                  style={{ ...navItemStyle(selectedChild?.id === c.id, accent, isDark), marginBottom: 2 }}
                 >
                   <User size={14} /> {c.name}
                 </button>
@@ -702,14 +708,14 @@ export default function ParentPortal() {
                 onClick={() => {
                   setActiveTab(item.id);
                 }}
-                style={navItemStyle(activeTab === item.id, accent)}
+                style={navItemStyle(activeTab === item.id, accent, isDark)}
               >
                 <item.icon size={16} /> {item.label}
               </button>
             ))}
           </nav>
           <div style={{ padding: '16px 12px', borderTop: `1px solid ${T.borderLight}` }}>
-            <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444'), color: '#ef4444' }}>
+            <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444', isDark), color: '#ef4444' }}>
               <LogOut size={16} /> Sign Out
             </button>
           </div>
@@ -718,15 +724,18 @@ export default function ParentPortal() {
 
       {/* MAIN */}
       <div className="print-main portal-main-content" style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
-        <div className="portal-desktop-toolbar print-hide">
-          <button className="portal-desktop-toggle-btn" onClick={() => setSidebarOpen(v => !v)} title={sidebarOpen ? 'Hide left sidebar' : 'Show left sidebar'}>
-            {sidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
-            <span>{sidebarOpen ? 'Hide Nav' : 'Show Nav'}</span>
-          </button>
-          <button className="portal-desktop-toggle-btn" onClick={() => setRightPanelOpen(v => !v)} title={rightPanelOpen ? 'Hide right panel' : 'Show right panel'}>
-            {rightPanelOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
-            <span>{rightPanelOpen ? 'Hide Panel' : 'Show Panel'}</span>
-          </button>
+        <div className="portal-desktop-toolbar print-hide" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="portal-desktop-toggle-btn" onClick={() => setSidebarOpen(v => !v)} title={sidebarOpen ? 'Hide left sidebar' : 'Show left sidebar'}>
+              {sidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+              <span>{sidebarOpen ? 'Hide Nav' : 'Show Nav'}</span>
+            </button>
+            <button className="portal-desktop-toggle-btn" onClick={() => setRightPanelOpen(v => !v)} title={rightPanelOpen ? 'Hide right panel' : 'Show right panel'}>
+              {rightPanelOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
+              <span>{rightPanelOpen ? 'Hide Panel' : 'Show Panel'}</span>
+            </button>
+          </div>
+          <ThemeToggle showLabel={true} />
         </div>
         <div className="portal-inner-content">{renderContent()}</div>
       </div>

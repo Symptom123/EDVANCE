@@ -1,10 +1,13 @@
-// Balanced template design tokens — shared across all portals
-export const T = {
+// Balanced template design tokens — light and dark mode support
+export const lightT = {
   // Backgrounds
   pageBg: '#f5f3ef',
   sidebarBg: '#ffffff',
   cardBg: '#ffffff',
   hoverBg: '#f9f7f4',
+  inputBg: '#ffffff',
+  tableHeaderBg: '#faf9f7',
+  tableRowBorder: '#f0ede8',
 
   // Borders
   border: '#e8e4dc',
@@ -29,33 +32,97 @@ export const T = {
   radiusPill: '100px',
 };
 
+export const darkT = {
+  // Backgrounds
+  pageBg: '#0f172a',
+  sidebarBg: '#1e293b',
+  cardBg: '#1e293b',
+  hoverBg: '#283347',
+  inputBg: '#0f172a',
+  tableHeaderBg: '#151f30',
+  tableRowBorder: '#293548',
+
+  // Borders
+  border: '#334155',
+  borderLight: '#293548',
+
+  // Text
+  text: '#f8fafc',
+  muted: '#94a3b8',
+  light: '#64748b',
+
+  // Fonts
+  fontSerif: '"DM Serif Text", Georgia, serif',
+  fontSans: '"DM Sans", system-ui, sans-serif',
+
+  // Shadows
+  shadow: '0 1px 4px rgba(0,0,0,0.3)',
+  shadowMd: '0 4px 16px rgba(0,0,0,0.4)',
+
+  // Radii
+  radius: '12px',
+  radiusSm: '8px',
+  radiusPill: '100px',
+};
+
+// Returns dynamic design token object based on mode
+export const getTheme = (isDark = false) => (isDark ? darkT : lightT);
+
+// Backward-compatible default light tokens
+export const T = lightT;
+
 // Helper: hex color to rgba
 export const rgba = (hex, alpha) => {
   try {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
+    if (!hex || !hex.startsWith('#')) return `rgba(37,99,235,${alpha})`;
+    const clean = hex.replace('#', '');
+    let r, g, b;
+    if (clean.length === 3) {
+      r = parseInt(clean[0] + clean[0], 16);
+      g = parseInt(clean[1] + clean[1], 16);
+      b = parseInt(clean[2] + clean[2], 16);
+    } else {
+      r = parseInt(clean.slice(0, 2), 16);
+      g = parseInt(clean.slice(2, 4), 16);
+      b = parseInt(clean.slice(4, 6), 16);
+    }
     return `rgba(${r},${g},${b},${alpha})`;
   } catch {
     return `rgba(37,99,235,${alpha})`;
   }
 };
 
-// Shared sidebar nav item style generator
-export const navItemStyle = (isActive, accent) => ({
-  display: 'flex', alignItems: 'center', gap: 12,
-  width: '100%', padding: '10px 14px',
-  background: isActive ? rgba(accent, 0.1) : 'transparent',
-  color: isActive ? accent : '#6b6b6b',
-  border: 'none', borderRadius: '8px',
-  cursor: 'pointer', textAlign: 'left',
-  fontSize: 14, fontWeight: isActive ? 600 : 500,
-  fontFamily: '"DM Sans", system-ui, sans-serif',
-  transition: 'all 0.15s ease',
-  letterSpacing: '0.1px',
-});
+// Dynamic sidebar nav item style generator
+export const navItemStyle = (isActive, accent, isDark = false) => {
+  const theme = isDark ? darkT : lightT;
+  return {
+    display: 'flex', alignItems: 'center', gap: 12,
+    width: '100%', padding: '10px 14px',
+    background: isActive ? rgba(accent, isDark ? 0.22 : 0.1) : 'transparent',
+    color: isActive ? accent : theme.muted,
+    border: 'none', borderRadius: '8px',
+    cursor: 'pointer', textAlign: 'left',
+    fontSize: 14, fontWeight: isActive ? 600 : 500,
+    fontFamily: '"DM Sans", system-ui, sans-serif',
+    transition: 'all 0.15s ease',
+    letterSpacing: '0.1px',
+  };
+};
 
-// Shared card style
+// Dynamic card style getter
+export const getCardStyle = (isDark = false) => {
+  const theme = isDark ? darkT : lightT;
+  return {
+    background: theme.cardBg,
+    border: `1px solid ${theme.border}`,
+    borderRadius: '12px',
+    padding: '24px',
+    boxShadow: theme.shadow,
+    color: theme.text,
+  };
+};
+
+// Backward-compatible static card style
 export const cardStyle = {
   background: '#ffffff',
   border: '1px solid #e8e4dc',
@@ -64,7 +131,19 @@ export const cardStyle = {
   boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
 };
 
-// Shared input style
+// Dynamic input style getter
+export const getInputStyle = (isDark = false) => {
+  const theme = isDark ? darkT : lightT;
+  return {
+    width: '100%', padding: '12px 14px',
+    fontFamily: '"DM Sans", system-ui, sans-serif', fontSize: 14,
+    border: `1.5px solid ${theme.border}`, borderRadius: '8px',
+    background: theme.inputBg, color: theme.text,
+    outline: 'none', boxSizing: 'border-box',
+  };
+};
+
+// Backward-compatible static input style
 export const inputStyle = {
   width: '100%', padding: '12px 14px',
   fontFamily: '"DM Sans", system-ui, sans-serif', fontSize: 14,

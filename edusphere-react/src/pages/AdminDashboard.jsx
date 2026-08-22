@@ -9,6 +9,8 @@ import {
   Edit2, Check, Sparkles, Hash, Layers
 } from 'lucide-react';
 import { T, rgba, navItemStyle, cardStyle, inputStyle, btnStyle, badge } from '../styles/portalTheme';
+import { useTheme } from '../context/ThemeContext';
+import ThemeToggle from '../components/ThemeToggle';
 import ReportCardControls from '../components/ReportCardControls';
 import ReportCardView from '../components/ReportCardView';
 import AdminReportCardGenerator from '../components/AdminReportCardGenerator';
@@ -18,6 +20,7 @@ const API = (import.meta.env.VITE_API_URL || 'https://edvance-1v00.onrender.com'
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { isDark, T, cardStyle, inputStyle } = useTheme();
   const [config, setConfig] = useState(null);
   const [activeView, setActiveView] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -1200,15 +1203,18 @@ export default function AdminDashboard() {
 
       {/* MOBILE HEADER (only visible on mobile) */}
       <div className="portal-mobile-header print-hide">
-        <button
-          className="portal-mobile-menu-btn"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          aria-label="Toggle navigation"
-        >
-          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
-        <img src="/logo.png" alt="Edvance Logo" style={{ height: 30, objectFit: 'contain' }} />
-        <span className="portal-mobile-role-badge">Admin</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            className="portal-mobile-menu-btn"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle navigation"
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+          <img src="/logo.png" alt="Edvance Logo" style={{ height: 30, objectFit: 'contain' }} />
+          <span className="portal-mobile-role-badge">Admin</span>
+        </div>
+        <ThemeToggle compact />
       </div>
 
       {/* MOBILE SLIDING DRAWER & BACKDROP */}
@@ -1232,14 +1238,14 @@ export default function AdminDashboard() {
                     setShowAddClass(false);
                     setMobileMenuOpen(false);
                   }}
-                  style={navItemStyle(activeView === item.id, accent)}
+                  style={navItemStyle(activeView === item.id, accent, isDark)}
                 >
                   <item.icon size={17} /> {item.label}
                 </button>
               ))}
             </nav>
             <div style={{ padding: '16px 12px', borderTop: `1px solid ${T.borderLight}` }}>
-              <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444'), color: '#ef4444' }}>
+              <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444', isDark), color: '#ef4444' }}>
                 <LogOut size={17} /> Sign Out
               </button>
             </div>
@@ -1269,14 +1275,14 @@ export default function AdminDashboard() {
                   setShowAddUser(false);
                   setShowAddClass(false);
                 }}
-                style={navItemStyle(activeView === item.id, accent)}
+                style={navItemStyle(activeView === item.id, accent, isDark)}
               >
                 <item.icon size={17} /> {item.label}
               </button>
             ))}
           </nav>
           <div style={{ padding: '16px 12px', borderTop: `1px solid ${T.borderLight}` }}>
-            <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444'), color: '#ef4444' }}>
+            <button onClick={() => { localStorage.removeItem('edvance_school_config'); navigate('/login'); }} style={{ ...navItemStyle(false, '#ef4444', isDark), color: '#ef4444' }}>
               <LogOut size={17} /> Sign Out
             </button>
           </div>
@@ -1286,23 +1292,26 @@ export default function AdminDashboard() {
       {/* MAIN CONTENT */}
       <div className="print-main portal-main-content" style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
         {/* Desktop sidebar toggle toolbar */}
-        <div className="portal-desktop-toolbar print-hide">
-          <button
-            className="portal-desktop-toggle-btn"
-            onClick={() => setSidebarOpen(v => !v)}
-            title={sidebarOpen ? 'Hide left sidebar' : 'Show left sidebar'}
-          >
-            {sidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
-            <span>{sidebarOpen ? 'Hide Nav' : 'Show Nav'}</span>
-          </button>
-          <button
-            className="portal-desktop-toggle-btn"
-            onClick={() => setRightPanelOpen(v => !v)}
-            title={rightPanelOpen ? 'Hide right panel' : 'Show right panel'}
-          >
-            {rightPanelOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
-            <span>{rightPanelOpen ? 'Hide Panel' : 'Show Panel'}</span>
-          </button>
+        <div className="portal-desktop-toolbar print-hide" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="portal-desktop-toggle-btn"
+              onClick={() => setSidebarOpen(v => !v)}
+              title={sidebarOpen ? 'Hide left sidebar' : 'Show left sidebar'}
+            >
+              {sidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+              <span>{sidebarOpen ? 'Hide Nav' : 'Show Nav'}</span>
+            </button>
+            <button
+              className="portal-desktop-toggle-btn"
+              onClick={() => setRightPanelOpen(v => !v)}
+              title={rightPanelOpen ? 'Hide right panel' : 'Show right panel'}
+            >
+              {rightPanelOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
+              <span>{rightPanelOpen ? 'Hide Panel' : 'Show Panel'}</span>
+            </button>
+          </div>
+          <ThemeToggle showLabel={true} />
         </div>
         <div className="portal-inner-content">{renderContent()}</div>
       </div>
